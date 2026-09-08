@@ -1,6 +1,6 @@
 """Remediation agent — generates a fix, rationale, and concrete steps per
 issue found by the Log Reader agent."""
-from llm import call_claude, extract_json
+from llm import call_llm, extract_json
 from state import Issue, Remediation
 
 SYSTEM_PROMPT = """You are a senior SRE writing remediation guidance.
@@ -22,7 +22,7 @@ class RemediationAgent:
         if not issues:
             return []
         payload = [dict(issue) for issue in issues]
-        raw = call_claude(SYSTEM_PROMPT, str(payload))
+        raw = call_llm(SYSTEM_PROMPT, str(payload), tier="reasoning")
         parsed = extract_json(raw)
 
         by_id = {item.get("issue_id"): item for item in parsed if isinstance(item, dict)}

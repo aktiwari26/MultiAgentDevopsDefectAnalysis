@@ -1,7 +1,16 @@
-"""Notification agent — UC-2 (Slack), with UC-6 degraded-mode semantics:
-any failure here is caught and recorded, never raised, so the pipeline
-always continues to Jira/Cookbook regardless of Slack outcome.
+"""Notification agent — UC-2, with UC-6 degraded-mode semantics: any
+failure here is caught and recorded, never raised, so the pipeline always
+continues to Jira/Cookbook regardless of notification outcome.
+
+Two independent channels, each optional:
+  - Slack, via an incoming webhook URL (no bot token/scopes needed).
+  - n8n, via a generic webhook URL, for downstream automation.
+When NOTIFICATION_MOCK_MODE is on (the default), neither channel is
+actually called — the payload is built and reported as "sent (mock)" so
+the pipeline is fully exercisable without real webhooks configured.
 """
+import requests
+
 from config import Config
 from dedup import DedupStore
 from state import Issue, Remediation, IntegrationResult
@@ -18,7 +27,7 @@ SEVERITY_EMOJI = {
 MAX_ISSUES_PER_MESSAGE = 20
 
 
-def _build_blocks(issues: list[Issue], remediation_by_id: dict[str, Remediation]) -> list[dict]:
+def _build_slack_blocks(issues: list[Issue], remediation_by_id: dict[str, Remediation]) -> list[dict]:
     blocks = [
         {
             "type": "header",
@@ -46,13 +55,59 @@ def _build_blocks(issues: list[Issue], remediation_by_id: dict[str, Remediation]
     return blocks
 
 
+def _send_slack(issues: list[Issue], remediation_by_id: dict[str, Remediation]) -> dict:
+    if not Config.slack_webhook_configured():
+        return {"status": "skipped", "detail": "SLACK_WEBHOOK_URL not configured."}
+    try:
+        for i in range(0, len(issues), MAX_ISSUES_PER_MESSAGE):
+            chunk = issues[i : i + MAX_ISSUES_PER_MESSAGE]
+            blocks = _build_slack_blocks(chunk, remediation_by_id)
+            resp = requests.post(
+                Config.SLACK_WEBHOOK_URL,
+                json={"blocks": blocks, "text": f"Incident analysis: {len(chunk)} issue(s) detected"},
+                timeout=15,
+            )
+            if resp.status_code >= 300:
+                return {"status": "error", "detail": f"Slack webhook HTTP {resp.status_code}: {resp.text[:300]}"}
+        return {"status": "sent", "detail": f"Posted {len(issues)} issue(s) via Slack webhook."}
+    except requests.RequestException as exc:
+        return {"status": "error", "detail": f"Slack webhook error: {exc}"}
+
+
+def _send_n8n(issues: list[Issue], remediation_by_id: dict[str, Remediation]) -> dict:
+    if not Config.n8n_webhook_configured():
+        return {"status": "skipped", "detail": "N8N_WEBHOOK_URL not configured."}
+    try:
+        payload = {
+            "issues": [dict(issue) for issue in issues],
+            "remediations": [
+                dict(remediation_by_id[i["id"]]) for i in issues if i["id"] in remediation_by_id
+            ],
+        }
+        resp = requests.post(Config.N8N_WEBHOOK_URL, json=payload, timeout=15)
+        if resp.status_code >= 300:
+            return {"status": "error", "detail": f"n8n webhook HTTP {resp.status_code}: {resp.text[:300]}"}
+        return {"status": "sent", "detail": f"Posted {len(issues)} issue(s) to n8n."}
+    except requests.RequestException as exc:
+        return {"status": "error", "detail": f"n8n webhook error: {exc}"}
+
+
+def _mock_channel_result(channel_configured: bool, label: str, count: int) -> dict:
+    if channel_configured:
+        return {"status": "sent", "detail": f"[MOCK] Would post {count} issue(s) via {label} (mock mode, not sent)."}
+    return {"status": "skipped", "detail": f"{label} not configured (and mock mode is on)."}
+
+
 class NotificationAgent:
     def __init__(self, dedup_store: DedupStore | None = None):
-        self.dedup_store = dedup_store or DedupStore()
+        self.dedup_store = dedup_store or DedupStore(namespace="notification")
 
     def run(self, issues: list[Issue], remediations: list[Remediation]) -> IntegrationResult:
-        if not Config.slack_configured():
-            return IntegrationResult(status="skipped", detail="Slack token/channel not configured.")
+        if not Config.notification_active():
+            return IntegrationResult(
+                status="skipped",
+                detail="Notifications disabled: no webhook configured and mock mode is off.",
+            )
 
         fresh_issues, suppressed = self.dedup_store.filter_new(issues)
         if not fresh_issues:
@@ -61,39 +116,36 @@ class NotificationAgent:
                 detail=f"All {len(suppressed)} issue(s) already notified within the dedup window.",
             )
 
-        try:
-            from slack_sdk import WebClient
-            from slack_sdk.errors import SlackApiError
-        except ImportError as exc:
-            return IntegrationResult(status="error", detail=f"slack_sdk not installed: {exc}")
-
-        client = WebClient(token=Config.SLACK_BOT_TOKEN)
         remediation_by_id = {r["issue_id"]: r for r in remediations}
-        sent_timestamps = []
 
-        try:
-            for i in range(0, len(fresh_issues), MAX_ISSUES_PER_MESSAGE):
-                chunk = fresh_issues[i : i + MAX_ISSUES_PER_MESSAGE]
-                blocks = _build_blocks(chunk, remediation_by_id)
-                response = client.chat_postMessage(
-                    channel=Config.SLACK_CHANNEL,
-                    blocks=blocks,
-                    text=f"Incident analysis: {len(chunk)} issue(s) detected",
-                )
-                sent_timestamps.append(response["ts"])
+        if Config.NOTIFICATION_MOCK_MODE:
+            channels = {
+                "slack": _mock_channel_result(Config.slack_webhook_configured(), "Slack", len(fresh_issues)),
+                "n8n": _mock_channel_result(Config.n8n_webhook_configured(), "n8n", len(fresh_issues)),
+            }
+        else:
+            channels = {
+                "slack": _send_slack(fresh_issues, remediation_by_id),
+                "n8n": _send_n8n(fresh_issues, remediation_by_id),
+            }
+
+        statuses = {c["status"] for c in channels.values()}
+        if "sent" in statuses:
+            # At least one channel got the message; suppress re-sending
+            # this signature elsewhere within the window. A channel that
+            # failed can still be retried on the next run since its issue
+            # wasn't durably delivered anywhere.
             self.dedup_store.mark_all_seen(fresh_issues)
-            detail = f"Posted {len(fresh_issues)} issue(s) to {Config.SLACK_CHANNEL}."
-            if suppressed:
-                detail += f" ({len(suppressed)} suppressed as duplicates.)"
-            return IntegrationResult(
-                status="sent",
-                detail=detail,
-                items=[{"ts": ts} for ts in sent_timestamps],
-            )
-        except SlackApiError as exc:
-            return IntegrationResult(
-                status="error",
-                detail=f"Slack API error: {exc.response.get('error', str(exc))}",
-            )
-        except Exception as exc:  # noqa: BLE001 - must never bubble up (UC-6)
-            return IntegrationResult(status="error", detail=f"Unexpected Slack error: {exc}")
+
+        if "error" in statuses:
+            overall = "error"
+        elif "sent" in statuses:
+            overall = "sent"
+        else:
+            overall = "skipped"
+
+        detail = f"Notified {len(fresh_issues)} issue(s)."
+        if suppressed:
+            detail += f" ({len(suppressed)} suppressed as duplicates.)"
+
+        return IntegrationResult(status=overall, detail=detail, channels=channels)

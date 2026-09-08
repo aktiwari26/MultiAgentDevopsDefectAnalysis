@@ -18,13 +18,22 @@ SEVERITY_BADGE = {
 
 
 def render_credential_banner():
-    with st.expander("Environment status", expanded=not Config.anthropic_configured()):
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Anthropic API", "Configured" if Config.anthropic_configured() else "Missing")
-        col2.metric("Slack", "Configured" if Config.slack_configured() else "Not configured")
-        col3.metric("Jira", "Configured" if Config.jira_configured() else "Not configured")
-        if not Config.anthropic_configured():
-            st.error("ANTHROPIC_API_KEY is required. Set it in .env before running an analysis.")
+    with st.expander("Environment status", expanded=not Config.openrouter_configured()):
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("OpenRouter", "Configured" if Config.openrouter_configured() else "Missing")
+        col2.metric(
+            "Notifications",
+            "Mock" if Config.NOTIFICATION_MOCK_MODE else (
+                "Configured" if (Config.slack_webhook_configured() or Config.n8n_webhook_configured()) else "Off"
+            ),
+        )
+        col3.metric(
+            "Jira",
+            "Mock" if Config.JIRA_MOCK_MODE else ("Configured" if Config.jira_configured() else "Off"),
+        )
+        col4.metric("LangSmith tracing", "On" if Config.langsmith_configured() else "Off")
+        if not Config.openrouter_configured():
+            st.error("OPENROUTER_API_KEY is required. Set it in .env before running an analysis.")
 
 
 def render_issues_tab(issues, remediations):
@@ -60,9 +69,28 @@ def render_integration_status(name: str, result: dict | None):
 
     for item in result.get("items", []):
         if "key" in item:
-            st.markdown(f"- [{item['key']}]({item['url']})")
+            label = f"- [{item['key']}]({item['url']})" if Config.JIRA_SERVER else f"- {item['key']} (mock)"
+            extras = []
+            if item.get("epic"):
+                extras.append(f"epic {item['epic']}")
+            if item.get("sprint"):
+                extras.append(f"sprint {item['sprint']}")
+            if extras:
+                label += f" ({', '.join(extras)})"
+            st.markdown(label)
         elif "error" in item:
             st.warning(f"- {item['issue_id']}: {item['error']}")
+
+    for channel, channel_result in result.get("channels", {}).items():
+        c_status = channel_result.get("status")
+        c_detail = channel_result.get("detail", "")
+        line = f"  - **{channel}**: {c_detail}"
+        if c_status == "sent":
+            st.success(line)
+        elif c_status in ("skipped", "no_op"):
+            st.info(line)
+        else:
+            st.error(line)
 
 
 def main():
@@ -87,7 +115,7 @@ def main():
         st.error(error)
 
     issues_tab, checklist_tab, integrations_tab = st.tabs(
-        ["Issues & Remediation", "Checklist", "Slack / Jira"]
+        ["Issues & Remediation", "Checklist", "Notifications / Jira"]
     )
 
     with issues_tab:
@@ -104,7 +132,7 @@ def main():
         )
 
     with integrations_tab:
-        render_integration_status("Slack", result.get("slack_result"))
+        render_integration_status("Notifications", result.get("notification_result"))
         render_integration_status("Jira", result.get("jira_result"))
 
 

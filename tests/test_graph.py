@@ -34,12 +34,12 @@ def test_uc5_clean_log_skips_remediation_and_integrations(monkeypatch):
 
     assert result["issues"] == []
     assert remediation_calls == []  # remediation node never ran
-    assert "slack_result" not in result
+    assert "notification_result" not in result
     assert "jira_result" not in result
     assert "No actionable issues" in result["checklist_md"]
 
 
-def test_uc6_slack_failure_does_not_block_jira_or_cookbook(monkeypatch):
+def test_uc6_notification_failure_does_not_block_jira_or_cookbook(monkeypatch):
     issue = make_issue()
     monkeypatch.setattr(graph.log_reader, "run", lambda log_content: [issue])
     monkeypatch.setattr(
@@ -52,7 +52,7 @@ def test_uc6_slack_failure_does_not_block_jira_or_cookbook(monkeypatch):
     monkeypatch.setattr(
         graph.notification_agent,
         "run",
-        lambda issues, remediations: IntegrationResult(status="error", detail="Slack API error: rate_limited"),
+        lambda issues, remediations: IntegrationResult(status="error", detail="Slack webhook error: rate_limited"),
     )
     monkeypatch.setattr(
         graph.jira_agent,
@@ -65,6 +65,6 @@ def test_uc6_slack_failure_does_not_block_jira_or_cookbook(monkeypatch):
     app = build_graph()
     result = app.invoke({"log_content": "boom", "errors": []})
 
-    assert result["slack_result"]["status"] == "error"
+    assert result["notification_result"]["status"] == "error"
     assert result["jira_result"]["status"] == "sent"
     assert "Restart pool" in result["checklist_md"]

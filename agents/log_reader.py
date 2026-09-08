@@ -5,7 +5,7 @@ severity rating. The severity rubric is explicit in the system prompt
 (Phase 4, pulled forward per the execution plan's priority order) since
 miscalibrated severity silently breaks Jira ticketing (UC-3).
 """
-from llm import call_claude, extract_json
+from llm import call_llm, extract_json
 from state import Issue
 
 SYSTEM_PROMPT = """You are a Site Reliability Engineering log analyst.
@@ -41,7 +41,7 @@ empty JSON array: []
 
 class LogReaderAgent:
     def run(self, log_content: str) -> list[Issue]:
-        raw = call_claude(SYSTEM_PROMPT, log_content)
+        raw = call_llm(SYSTEM_PROMPT, log_content, tier="fast")
         parsed = extract_json(raw)
         issues: list[Issue] = []
         for i, item in enumerate(parsed):

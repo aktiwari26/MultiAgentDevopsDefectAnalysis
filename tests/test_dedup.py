@@ -54,3 +54,19 @@ def test_filter_new_allows_after_window_expires(tmp_path):
 def test_store_survives_missing_file(tmp_path):
     store = DedupStore(path=str(tmp_path / "does_not_exist.json"), window_hours=24)
     assert store.seen_recently("whatever") is False
+
+
+def test_namespaces_isolate_same_file(tmp_path):
+    """Notification and Jira share one JSON file but must not share dedup
+    state: notifying an issue via Slack must not suppress filing its Jira
+    ticket on the same run, and vice versa."""
+    path = str(tmp_path / "shared.json")
+    notification_store = DedupStore(path=path, window_hours=24, namespace="notification")
+    jira_store = DedupStore(path=path, window_hours=24, namespace="jira")
+    issue = make_issue()
+
+    notification_store.mark_all_seen([issue])
+
+    fresh, suppressed = jira_store.filter_new([issue])
+    assert fresh == [issue]
+    assert suppressed == []

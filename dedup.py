@@ -24,9 +24,23 @@ def issue_signature(issue: Issue) -> str:
 
 
 class DedupStore:
-    def __init__(self, path: str = Config.DEDUP_STORE_PATH, window_hours: float = Config.DEDUP_WINDOW_HOURS):
+    """Backed by a single shared JSON file, but keys are namespaced per
+    integration channel (e.g. "notification" vs "jira") so notifying an
+    issue in Slack doesn't silently suppress filing its Jira ticket on the
+    same run, and vice versa."""
+
+    def __init__(
+        self,
+        path: str = Config.DEDUP_STORE_PATH,
+        window_hours: float = Config.DEDUP_WINDOW_HOURS,
+        namespace: str = "default",
+    ):
         self.path = path
         self.window_seconds = window_hours * 3600
+        self.namespace = namespace
+
+    def _key(self, signature: str) -> str:
+        return f"{self.namespace}:{signature}"
 
     def _load(self) -> dict:
         if not os.path.exists(self.path):
@@ -43,14 +57,14 @@ class DedupStore:
 
     def seen_recently(self, signature: str) -> bool:
         data = self._load()
-        last_seen = data.get(signature)
+        last_seen = data.get(self._key(signature))
         if last_seen is None:
             return False
         return (time.time() - last_seen) < self.window_seconds
 
     def mark_seen(self, signature: str) -> None:
         data = self._load()
-        data[signature] = time.time()
+        data[self._key(signature)] = time.time()
         self._save(data)
 
     def filter_new(self, issues: list[Issue]) -> tuple[list[Issue], list[Issue]]:

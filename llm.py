@@ -1,39 +1,56 @@
-"""Thin wrapper around the Anthropic SDK shared by all agents."""
+"""Thin LLM wrapper shared by all agents.
+
+Talks to OpenRouter (an OpenAI-compatible endpoint) via the `openai` SDK.
+When LangSmith tracing is enabled (LANGCHAIN_TRACING_V2=true +
+LANGCHAIN_API_KEY set), the client is wrapped with
+`langsmith.wrappers.wrap_openai` so every call shows up as a trace in the
+configured LANGCHAIN_PROJECT without any per-call code changes elsewhere.
+"""
 import json
 import re
 
-from anthropic import Anthropic
+from openai import OpenAI
 
 from config import Config
 
-_client: Anthropic | None = None
+_client: OpenAI | None = None
 
 
-def get_client() -> Anthropic:
+def get_client() -> OpenAI:
     global _client
     if _client is None:
-        if not Config.anthropic_configured():
+        if not Config.openrouter_configured():
             raise RuntimeError(
-                "ANTHROPIC_API_KEY is not set. All agents require it (see Phase 0)."
+                "OPENROUTER_API_KEY is not set. All agents require it (see Phase 0)."
             )
-        _client = Anthropic(api_key=Config.ANTHROPIC_API_KEY)
+        client = OpenAI(api_key=Config.OPENROUTER_API_KEY, base_url=Config.OPENROUTER_BASE_URL)
+        if Config.langsmith_configured():
+            from langsmith.wrappers import wrap_openai
+
+            client = wrap_openai(client)
+        _client = client
     return _client
 
 
-def call_claude(system: str, user: str, max_tokens: int = 4096) -> str:
+def call_llm(system: str, user: str, tier: str = "fast", max_tokens: int = 4096) -> str:
+    """tier: "fast" (extraction/classification) or "reasoning" (generation
+    that benefits from a stronger model)."""
+    model = Config.MODEL_REASONING if tier == "reasoning" else Config.MODEL_FAST
     client = get_client()
-    response = client.messages.create(
-        model=Config.ANTHROPIC_MODEL,
+    response = client.chat.completions.create(
+        model=model,
         max_tokens=max_tokens,
-        system=system,
-        messages=[{"role": "user", "content": user}],
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
     )
-    return "".join(block.text for block in response.content if block.type == "text")
+    return response.choices[0].message.content or ""
 
 
 def extract_json(text: str):
-    """Pull a JSON array/object out of a Claude response that may be wrapped
-    in prose or a ```json code fence."""
+    """Pull a JSON array/object out of a model response that may be
+    wrapped in prose or a ```json code fence."""
     fenced = re.search(r"```(?:json)?\s*(\[.*?\]|\{.*?\})\s*```", text, re.DOTALL)
     candidate = fenced.group(1) if fenced else text.strip()
     try:

@@ -1,7 +1,7 @@
 """LangGraph orchestrator wiring the five agents into the pipeline
 described in the Requirement Dependency Map:
 
-Anthropic API key
+OpenRouter API key
   -> Log Reader Agent (UC-1, UC-5)
        -> issues[] populated?
             NO  -> Cookbook Agent (UC-4, UC-5)
@@ -36,7 +36,7 @@ def log_reader_node(state: IncidentState) -> dict:
     try:
         issues = log_reader.run(state["log_content"])
         return {"issues": issues}
-    except Exception as exc:  # noqa: BLE001 - Anthropic outage must not crash the app
+    except Exception as exc:  # noqa: BLE001 - an LLM outage must not crash the app
         return {"issues": [], "errors": _append_error(state, f"Log Reader failed: {exc}")}
 
 
@@ -50,7 +50,7 @@ def remediation_node(state: IncidentState) -> dict:
 
 def notification_node(state: IncidentState) -> dict:
     result = notification_agent.run(state["issues"], state.get("remediations", []))
-    return {"slack_result": result}
+    return {"notification_result": result}
 
 
 def jira_node(state: IncidentState) -> dict:
