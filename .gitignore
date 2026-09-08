@@ -1,0 +1,22 @@
+# Secrets
+.env
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Dedup store (local run state, not source)
+.dedup_store.json
+
+# OS
+.DS_Store
+Thumbs.db
