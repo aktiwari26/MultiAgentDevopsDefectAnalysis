@@ -5,3 +5,4 @@ langsmith
 requests
 python-dotenv
 pytest
+truststore

@@ -8,6 +8,15 @@ UC-2/UC-3/UC-6).
 """
 import os
 
+import truststore
+
+# Corporate networks often TLS-intercept outbound HTTPS with a proxy CA that
+# only the OS trust store knows about (not the certifi bundle requests/httpx
+# ship with by default). Route all ssl.SSLContext creation through the OS
+# store so `requests` (Slack/Jira/n8n) verifies the same way the `openai`
+# SDK's bundled transport already does. Safe to call once, globally.
+truststore.inject_into_ssl()
+
 from dotenv import load_dotenv
 
 load_dotenv()
