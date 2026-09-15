@@ -1,12 +1,20 @@
 """Environment-driven configuration for the DevOps Incident Analysis Suite.
 
-Covers Phase 0 credentials: OpenRouter (required), LangSmith (optional
+Covers credentials: OpenRouter (required), LangSmith (optional
 observability), Jira (optional, mock by default), Slack/n8n notifications
 (optional, mock by default). Missing optional groups degrade their branch
-of the graph gracefully rather than blocking the whole run (see
-UC-2/UC-3/UC-6).
+of the pipeline gracefully rather than blocking the whole run.
 """
 import os
+
+import truststore
+
+# Corporate networks often TLS-intercept outbound HTTPS with a proxy CA that
+# only the OS trust store knows about (not the certifi bundle requests/httpx
+# ship with by default). Route all ssl.SSLContext creation through the OS
+# store so `requests` (Slack/Jira/n8n) verifies the same way the `openai`
+# SDK's bundled transport already does. Safe to call once, globally.
+truststore.inject_into_ssl()
 
 from dotenv import load_dotenv
 
@@ -27,6 +35,9 @@ class Config:
     # "reasoning" tier — used for generation that needs more reasoning
     # (Remediation).
     MODEL_REASONING = os.getenv("MODEL_REASONING", "openai/gpt-4o")
+    # "generation" tier — used by the DevOps pipeline's Cookbook stage
+    # (api/main.py, devops_agents.py). Defaults to the fast tier's model.
+    MODEL_GENERATION = os.getenv("MODEL_GENERATION", "openai/gpt-4o-mini")
 
     # ── LangSmith (observability) ────────────────────────────────────────
     # Read directly by the langsmith/langchain-core SDKs from the process
@@ -35,7 +46,7 @@ class Config:
     # so the UI can report whether tracing is active.
     LANGCHAIN_TRACING_V2 = _bool_env("LANGCHAIN_TRACING_V2", "False")
     LANGCHAIN_API_KEY = os.getenv("LANGCHAIN_API_KEY", "")
-    LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT", "CrewOps-Hackathon")
+    LANGCHAIN_PROJECT = os.getenv("LANGCHAIN_PROJECT", "DevOps-Hackathon")
     LANGCHAIN_ENDPOINT = os.getenv("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
 
     # ── Jira integration ─────────────────────────────────────────────────
@@ -51,23 +62,10 @@ class Config:
     # the common default on modern Jira Cloud instances but is overridable.
     JIRA_SPRINT_FIELD_ID = os.getenv("JIRA_SPRINT_FIELD_ID", "customfield_10020")
 
-    # Phase 3: which severities are ticket-worthy (default matches the spec:
-    # critical + high). Comma-separated env override, e.g. "critical".
-    JIRA_TICKET_SEVERITIES = {
-        s.strip().lower()
-        for s in os.getenv("JIRA_TICKET_SEVERITIES", "critical,high").split(",")
-        if s.strip()
-    }
-
     # ── Slack / n8n notifications ────────────────────────────────────────
     NOTIFICATION_MOCK_MODE = _bool_env("NOTIFICATION_MOCK_MODE", "True")
     SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL", "")
     N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "")
-
-    # Phase 4: dedup window, in hours, for suppressing repeat notify/ticket
-    # of an issue signature already raised recently.
-    DEDUP_WINDOW_HOURS = float(os.getenv("DEDUP_WINDOW_HOURS", "24"))
-    DEDUP_STORE_PATH = os.getenv("DEDUP_STORE_PATH", ".dedup_store.json")
 
     @classmethod
     def openrouter_configured(cls) -> bool:
@@ -88,19 +86,9 @@ class Config:
         )
 
     @classmethod
-    def jira_active(cls) -> bool:
-        """Whether the Jira branch will do *anything* (mock or real)."""
-        return cls.JIRA_MOCK_MODE or cls.jira_configured()
-
-    @classmethod
     def slack_webhook_configured(cls) -> bool:
         return bool(cls.SLACK_WEBHOOK_URL)
 
     @classmethod
     def n8n_webhook_configured(cls) -> bool:
         return bool(cls.N8N_WEBHOOK_URL)
-
-    @classmethod
-    def notification_active(cls) -> bool:
-        """Whether the Notification branch will do *anything* (mock or real)."""
-        return cls.NOTIFICATION_MOCK_MODE or cls.slack_webhook_configured() or cls.n8n_webhook_configured()

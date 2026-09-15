@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-glass-border;
+  }
+  body {
+    @apply bg-surface text-slate-200;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-700/50 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-600/50;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/[0.03] backdrop-blur-xl border border-white/[0.06];
+  }
+  .glass-hover {
+    @apply hover:bg-white/[0.06] transition-colors duration-200;
+  }
+  .glass-card {
+    @apply glass rounded-xl;
+  }
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-400 to-violet-400;
+  }
+  .glow-border {
+    @apply relative;
+  }
+  .glow-border::before {
+    content: '';
+    @apply absolute -inset-px rounded-xl bg-gradient-to-r from-blue-500/20 via-indigo-500/20 to-violet-500/20 opacity-0 transition-opacity duration-300;
+    z-index: -1;
+  }
+  .glow-border:hover::before {
+    @apply opacity-100;
+  }
+  .pulse-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+  .pulse-dot.green {
+    @apply bg-emerald-400;
+    box-shadow: 0 0 8px rgba(52, 211, 153, 0.5);
+  }
+  .pulse-dot.red {
+    @apply bg-red-400;
+    box-shadow: 0 0 8px rgba(248, 113, 113, 0.5);
+  }
+  .pulse-dot.green.animate {
+    animation: pulse-green 2s ease-in-out infinite;
+  }
+  .pulse-dot.red.animate {
+    animation: pulse-red 2s ease-in-out infinite;
+  }
+  @keyframes pulse-green {
+    0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(52, 211, 153, 0.5); }
+    50% { opacity: 0.5; box-shadow: 0 0 4px rgba(52, 211, 153, 0.2); }
+  }
+  @keyframes pulse-red {
+    0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(248, 113, 113, 0.5); }
+    50% { opacity: 0.5; box-shadow: 0 0 4px rgba(248, 113, 113, 0.2); }
+  }
+  .progress-bar {
+    @apply h-1 rounded-full bg-white/[0.06] overflow-hidden;
+  }
+  .progress-bar-fill {
+    @apply h-full rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500 transition-all duration-500;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
