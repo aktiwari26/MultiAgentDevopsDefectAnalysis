@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevOps | Official Documentation</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@100;300;400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #00f2fe;
+            --primary-glow: rgba(0, 242, 254, 0.5);
+            --secondary: #4facfe;
+            --accent: #b026ff;
+            --bg: #020617;
+            --surface: #0f172a;
+            --surface-light: #1e293b;
+            --text-heading: #ffffff;
+            --text-body: #94a3b8;
+            --text-muted: #64748b;
+            --border: rgba(255, 255, 255, 0.06);
+            --glass: rgba(15, 23, 42, 0.8);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-body);
+            font-family: 'Outfit', sans-serif;
+            line-height: 1.7;
+            scroll-behavior: smooth;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--surface-light);
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* Typography */
+        h1,
+        h2,
+        h3,
+        h4 {
+            color: var(--text-heading);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        p {
+            margin-bottom: 1.5rem;
+            font-weight: 300;
+            font-size: 1.1rem;
+        }
+
+        code {
+            font-family: 'JetBrains Mono', monospace;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: var(--primary);
+            font-size: 0.9em;
+        }
+
+        /* Header / Hero */
+        .hero {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(0, 242, 254, 0.05) 0%, transparent 70%);
+            transform: translate(-50%, -50%);
+            z-index: -1;
+        }
+
+        .hero-badge {
+            background: rgba(0, 242, 254, 0.1);
+            border: 1px solid var(--primary-glow);
+            padding: 8px 20px;
+            border-radius: 100px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--primary);
+            margin-bottom: 2rem;
+            animation: fadeIn 1s ease-out;
+        }
+
+        .hero h1 {
+            font-size: 5rem;
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            line-height: 1.1;
+        }
+
+        .hero p {
+            font-size: 1.4rem;
+            max-width: 700px;
+            color: var(--text-muted);
+        }
+
+        /* Navigation */
+        .toc {
+            position: sticky;
+            top: 2rem;
+            height: fit-content;
+            padding: 2rem;
+            background: var(--glass);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            margin-bottom: 4rem;
+        }
+
+        .toc h5 {
+            text-transform: uppercase;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+            letter-spacing: 1px;
+        }
+
+        .toc ul {
+            list-style: none;
+        }
+
+        .toc li {
+            margin-bottom: 0.8rem;
+        }
+
+        .toc a {
+            color: var(--text-body);
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.3s;
+        }
+
+        .toc a:hover {
+            color: var(--primary);
+        }
+
+        /* Content Layout */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 4rem;
+            margin-top: 4rem;
+        }
+
+        .section-header {
+            margin-bottom: 3rem;
+        }
+
+        .section-header h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid var(--primary);
+            padding-left: 1.5rem;
+        }
+
+        .content-card {
+            background: var(--glass);
+            backdrop-filter: blur(8px);
+            border: 1px solid var(--border);
+            padding: 3rem;
+            border-radius: 32px;
+            margin-bottom: 4rem;
+            box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.5);
+        }
+
+        /* UI Showcase */
+        .showcase-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 6rem;
+        }
+
+        .showcase-item {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 2rem;
+        }
+
+        .showcase-img-container {
+            position: relative;
+            border-radius: 24px;
+            padding: 10px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+            border: 1px solid var(--border);
+            box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .showcase-img-container img {
+            width: 100%;
+            border-radius: 16px;
+            display: block;
+            filter: brightness(0.9);
+            transition: filter 0.3s;
+        }
+
+        .showcase-img-container:hover img {
+            filter: brightness(1.1);
+        }
+
+        .showcase-info h4 {
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+
+        .showcase-info p {
+            color: var(--text-body);
+            font-size: 1.1rem;
+        }
+
+        /* Tables & Lists */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 2rem 0;
+            font-size: 0.95rem;
+        }
+
+        .data-table th {
+            text-align: left;
+            padding: 1.2rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-muted);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 1px;
+        }
+
+        .data-table td {
+            padding: 1.2rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-body);
+        }
+
+        .data-table tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .feature-list {
+            list-style: none;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .feature-icon {
+            color: var(--primary);
+            font-size: 1.2rem;
+        }
+
+        /* Code Blocks */
+        .code-block {
+            background: #000;
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            margin: 2rem 0;
+            overflow: hidden;
+        }
+
+        .code-header {
+            background: #0f172a;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .code-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+
+        .code-content {
+            padding: 2rem;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            color: #e2e8f0;
+            line-height: 1.6;
+        }
+
+        .code-content .comment {
+            color: #64748b;
+        }
+
+        .code-content .keyword {
+            color: var(--primary);
+        }
+
+        /* Footer */
+        footer {
+            margin-top: 10rem;
+            padding: 6rem 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+
+        footer p {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .toc {
+                display: none;
+            }
+
+            .hero h1 {
+                font-size: 3.5rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <section class="hero">
+        <div class="hero-badge">Technical Specification 2026</div>
+        <h1>DevOps Intelligence Report</h1>
+        <p>A multi-agent autonomous framework for production-grade incident remediation and log analysis.</p>
+    </section>
+
+    <div class="container">
+        <div class="main-grid">
+            <aside>
+                <div class="toc">
+                    <h5>Contents</h5>
+                    <ul>
+                        <li><a href="#overview">01. Overview</a></li>
+                        <li><a href="#architecture">02. Architecture</a></li>
+                        <li><a href="#roster">03. Agent Roster</a></li>
+                        <li><a href="#ui">04. User Interface</a></li>
+                        <li><a href="#install">05. Implementation</a></li>
+                        <li><a href="#roadmap">06. Future Roadmap</a></li>
+                    </ul>
+                </div>
+            </aside>
+
+            <main>
+                <section id="overview">
+                    <div class="section-header">
+                        <h2>System Overview</h2>
+                        <p>DevOps is designed to eliminate the manual overhead of incident response. By integrating
+                            state-of-the-art LLMs with a retrieval-augmented grounding layer, the system provides
+                            deterministic actions from non-deterministic inputs.</p>
+                    </div>
+                    <div class="content-card">
+                        <p>In the modern DevOps landscape, speed is the only metric that matters. DevOps achieves a
+                            <strong>96.7% reduction in MTTR</strong> by automating the entire lifecycle of an
+                            incident—from initial log ingestion to final JIRA resolution and Slack notification.
+                        </p>
+                        <div class="feature-list">
+                            <div class="feature-item"><span class="feature-icon">✦</span> Multi-Agent LangGraph Core
+                            </div>
+                            <div class="feature-item"><span class="feature-icon">✦</span> LanceDB Vector Grounding</div>
+                            <div class="feature-item"><span class="feature-icon">✦</span> 3-Tier LLM Architecture</div>
+                            <div class="feature-item"><span class="feature-icon">✦</span> Real-time Observability</div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="architecture">
+                    <div class="section-header">
+                        <h2>Orchestration Layer</h2>
+                        <p>The system is built on a <code>StateGraph</code> foundation, enabling complex conditional
+                            routing and parallel processing.</p>
+                    </div>
+                    <div class="content-card">
+                        <h4>TypedDict State Schema</h4>
+                        <p>A unified state object traverses the graph, accumulating context at each node. Parallel
+                            fan-out is handled via <code>Annotated</code> list reducers.</p>
+                        <div class="code-block">
+                            <div class="code-header">
+                                <div class="code-dot" style="background: #ff5f56;"></div>
+                                <div class="code-dot" style="background: #ffbd2e;"></div>
+                                <div class="code-dot" style="background: #27c93f;"></div>
+                            </div>
+                            <div class="code-content">
+                                <span class="keyword">class</span> DevOpsState(TypedDict):
+                                raw_logs: str <span class="comment">
+                                    <br># Raw input logs</span>
+                                <br>classification: str <span class="comment"># gpt-4o-mini output</span>
+                                <br>severity: str <span class="comment"># P1-P4 assessment</span>
+                                <br>rag_context: Annotated[list, operator.add] <span class="comment"># Parallel
+                                    accumulation</span>
+                                <br>root_cause: str
+                                <br>remediation_plan: str
+                                cookbook: str
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="roster">
+                    <div class="section-header">
+                        <h2>Agent Roster</h2>
+                    </div>
+                    <div class="content-card" style="padding: 0;">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Agent</th>
+                                    <th>Model Configuration</th>
+                                    <th>Primary Role</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>01</td>
+                                    <td><strong>Classifier</strong></td>
+                                    <td>gpt-4o-mini (t: 0.1)</td>
+                                    <td>Structure logs & extract entities</td>
+                                </tr>
+                                <tr>
+                                    <td>02</td>
+                                    <td><strong>Severity</strong></td>
+                                    <td>gpt-4o-mini (t: 0.1)</td>
+                                    <td>Risk assessment & triage routing</td>
+                                </tr>
+                                <tr>
+                                    <td>03</td>
+                                    <td><strong>Analyst</strong></td>
+                                    <td>gpt-4o (t: 0.2)</td>
+                                    <td>RAG-grounded RCA with LanceDB</td>
+                                </tr>
+                                <tr>
+                                    <td>04</td>
+                                    <td><strong>Planner</strong></td>
+                                    <td>gpt-4o (t: 0.2)</td>
+                                    <td>Remediation strategy generation</td>
+                                </tr>
+                                <tr>
+                                    <td>05</td>
+                                    <td><strong>Synthesizer</strong></td>
+                                    <td>gpt-4o-mini (t: 0.3)</td>
+                                    <td>Operational cookbook production</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section id="ui">
+                    <div class="section-header">
+                        <h2>Interface Design</h2>
+                        <p>A premium React-based dashboard providing high-fidelity visual control over the agent
+                            pipeline.</p>
+                    </div>
+                    <div class="showcase-grid">
+                        <div class="showcase-item">
+                            <div class="showcase-info">
+                                <h4>01. Analysis Command Center</h4>
+                                <p>The primary workspace for log ingestion and real-time agent tracking. Built with
+                                    glassmorphism principles and Outfit typography.</p>
+                            </div>
+                            <div class="showcase-img-container">
+                                <img src="dashboard_mockup.png" alt="Command Center">
+                            </div>
+                        </div>
+                        <div class="showcase-item">
+                            <div class="showcase-info">
+                                <h4>02. Operational Analytics</h4>
+                                <p>Advanced data visualization for incident trends, resolution efficiency, and agent
+                                    accuracy metrics.</p>
+                            </div>
+                            <div class="showcase-img-container">
+                                <img src="analytics_mockup.png" alt="Analytics Hub">
+                            </div>
+                        </div>
+                        <div class="showcase-item">
+                            <div class="showcase-info">
+                                <h4>03. RAG Tuning Studio</h4>
+                                <p>A technical interface for managing the vector search layer, allowing SREs to tune
+                                    knowledge grounding parameters.</p>
+                            </div>
+                            <div class="showcase-img-container">
+                                <img src="rag_tuning_mockup.png" alt="RAG Tuning Studio">
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="install">
+                    <div class="section-header">
+                        <h2>Implementation Guide</h2>
+                    </div>
+                    <div class="content-card">
+                        <h4>Environment Configuration</h4>
+                        <p>DevOps requires a Python 3.11+ environment and access to OpenRouter for LLM orchestration.
+                        </p>
+                        <div class="code-block">
+                            <div class="code-content">
+                                <span class="comment"># 1. Initialize Python Backend</span>
+                                <br>&nbsp; &nbsp;$ cd backend
+                                <br>&nbsp; &nbsp;$ python -m venv .venv
+                                <br>&nbsp; &nbsp;$ source .venv/bin/activate <span class="comment">
+                                    <br>&nbsp; &nbsp;# Windows:.venv\Scripts\activate</span>
+                                <br>&nbsp; &nbsp;$ pip install -r requirements.txt
+                                <br>&nbsp; &nbsp;$ pip install -e .
+
+                                <span class="comment"><br># 2. Configure Environment</span>
+                                <span class="comment"><br>&nbsp; &nbsp;# Edit backend/.env with your API keys</span>
+                                <br>&nbsp; &nbsp;$ uvicorn api.main:app --reload --port 8000
+
+                                <span class="comment"><br># 3. Initialize React Frontend</span>
+                                <span class="comment"><br>&nbsp; &nbsp;# In a new terminal (root directory)</span>
+                                <br>&nbsp; &nbsp;$ pnpm install
+                                <br>&nbsp; &nbsp;$ pnpm run dev
+                            </div>
+                        </div>
+                        <p>For production deployment, use <code>pnpm run build</code> to generate the static assets in
+                            the <code>dist/</code> folder, which can be served by any web server (Nginx, Vercel, etc.).
+                        </p>
+                    </div>
+                </section>
+
+                <section id="roadmap">
+                    <div class="section-header">
+                        <h2>Future Roadmap</h2>
+                    </div>
+                    <div class="content-card">
+                        <p>The next phase of DevOps development focuses on closing the feedback loop with automated
+                            execution nodes.</p>
+                        <div class="feature-list">
+                            <div class="feature-item"><span class="feature-icon">▹</span> Human-in-the-loop Approval
+                                Node</div>
+                            <div class="feature-item"><span class="feature-icon">▹</span> Auto-PR generation for
+                                infra-fixes</div>
+                            <div class="feature-item"><span class="feature-icon">▹</span> Multi-cluster K8s integration
+                            </div>
+                            <div class="feature-item"><span class="feature-icon">▹</span> PagerDuty native channel
+                                support</div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 DevOps Technical Operations. Confidentiality: Public Release.</p>
+            <p>Designed and Built for the AI Post-Training Hackathon.</p>
+        </div>
+    </footer>
+
+</body>
+
+</html>

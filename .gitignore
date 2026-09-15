@@ -1,6 +1,5 @@
 # Secrets
 .env
-.streamlit/secrets.toml
 
 # Python
 __pycache__/
@@ -14,8 +13,9 @@ venv/
 .venv/
 env/
 
-# Dedup store (local run state, not source)
-.dedup_store.json
+# Frontend (React/Vite)
+frontend/node_modules/
+frontend/dist/
 
 # OS
 .DS_Store

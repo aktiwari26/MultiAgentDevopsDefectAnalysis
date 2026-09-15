@@ -1,8 +1,9 @@
-streamlit
 langgraph
-openai
-langsmith
 requests
 python-dotenv
 pytest
 truststore
+fastapi
+uvicorn
+langchain-core
+langchain-openai
