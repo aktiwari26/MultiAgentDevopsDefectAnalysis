@@ -91,3 +91,21 @@ def base_state(raw_logs: str, metadata: dict) -> dict:
         "pipeline_status": {},
         "errors": [],
     }
+
+
+def apply_update(state: dict, update: dict) -> dict:
+    """Fold one LangGraph stream update ({node_name: partial_state}) into a full
+    state dict using the same reducers as DevOpsState (list fields append,
+    pipeline_status merges, everything else overwrites)."""
+    merged = dict(state)
+    for output in update.values():
+        if not isinstance(output, dict):
+            continue
+        for key, value in output.items():
+            if key in LIST_FIELDS_WITH_REDUCERS:
+                merged[key] = list(merged.get(key) or []) + list(value or [])
+            elif key in DICT_FIELDS_WITH_REDUCERS:
+                merged[key] = _merge_pipeline_status(merged.get(key) or {}, value or {})
+            else:
+                merged[key] = value
+    return merged

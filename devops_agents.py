@@ -34,11 +34,14 @@ from config import Config
 from devops_state import DevOpsState
 from devops_parsers import (
     detect_log_type,
+    parse_log_type,
     parse_severity_response,
     severity_requires_approval,
     build_slack_blocks,
 )
-from devops_rag import search_knowledge_base
+from devops_rag import build_rag_query, search_knowledge_base
+from devops_security import strip_mentions
+import devops_dedup
 
 _llm_fast: Optional[Any] = None
 _llm_reasoning: Optional[Any] = None
@@ -54,6 +57,19 @@ def configure_llms(fast: Any, reasoning: Any, generation: Any) -> None:
 
 def _elapsed(start: float) -> float:
     return round(time.time() - start, 2)
+
+
+def _require_approval(state: DevOpsState) -> bool:
+    """Whether this run asked for the human approval gate (set per request
+    in state['metadata'], defaulting to Config.REQUIRE_APPROVAL)."""
+    return bool((state.get("metadata") or {}).get("require_approval", Config.REQUIRE_APPROVAL))
+
+
+def _kb_context(state: DevOpsState) -> str:
+    """The knowledge-base passages retrieved for this incident (shared by the
+    Remediation and Cookbook stages so they cite the same sources as the RCA)."""
+    passages = [p for p in (state.get("rag_context") or []) if p and str(p).strip()]
+    return "\n\n---\n\n".join(passages) or "No knowledge-base passages were retrieved for this incident."
 
 
 def _get_prompts():
@@ -79,7 +95,11 @@ def classifier_node(state: DevOpsState, llm: Optional[Any] = None) -> dict:
         cp, *_ = _get_prompts()
         chain = cp | llm | StrOutputParser()
         result = chain.invoke({"log_content": state["raw_logs"]})
-        log_type = detect_log_type(state["raw_logs"])
+        # Prefer the model's own LOG_TYPE label (it can recognise a mixed
+        # multi-source log); fall back to the keyword heuristic when the label
+        # is missing, garbled, or "other".
+        llm_log_type, result = parse_log_type(result)
+        log_type = llm_log_type or detect_log_type(state["raw_logs"])
 
         elapsed = _elapsed(start)
         status["classifier"] = {"status": "done", "elapsed_s": elapsed}
@@ -112,7 +132,7 @@ def severity_node(state: DevOpsState, llm: Optional[Any] = None) -> dict:
         result_text = chain.invoke({"log_summary": state["log_summary"]})
 
         parsed = parse_severity_response(result_text)
-        approval_required, approval_status = severity_requires_approval(parsed["severity"])
+        approval_required, approval_status = severity_requires_approval(parsed["severity"], _require_approval(state))
 
         elapsed = _elapsed(start)
         status["severity"] = {"status": "done", "elapsed_s": elapsed}
@@ -130,12 +150,13 @@ def severity_node(state: DevOpsState, llm: Optional[Any] = None) -> dict:
         elapsed = _elapsed(start)
         status["severity"] = {"status": "error", "elapsed_s": elapsed}
         print(f"   severity error: {e}")
+        approval_required, approval_status = severity_requires_approval("P2", _require_approval(state))
         return {
             "severity": "P2",
             "severity_rationale": f"Default P2 assigned due to error: {e}",
             "critical_issues": [],
-            "approval_required": True,
-            "approval_status": "auto_approved",
+            "approval_required": approval_required,
+            "approval_status": approval_status,
             "errors": [f"severity: {e}"],
             "pipeline_status": status,
         }
@@ -155,11 +176,9 @@ def root_cause_node(
 
     log_type = state.get("log_type", "incident")
     issues = state.get("critical_issues") or []
-    issue_titles = " ".join([
-        i.get("title", i) if isinstance(i, dict) else str(i)
-        for i in issues[:3]
-    ])
-    rag_query = f"{log_type} {issue_titles} {state['log_summary'][:200]}"
+    # Query from the incident's own evidence (issue titles, error lines of the
+    # raw log, summary body) rather than the report heading.
+    rag_query = build_rag_query(log_type, issues, state.get("log_summary", ""), state.get("raw_logs", ""))
 
     # Retrieval happens unconditionally, before the try/except, so RAG
     # context is captured even if the subsequent LLM call fails.
@@ -217,6 +236,7 @@ def remediation_node(state: DevOpsState, llm: Optional[Any] = None) -> dict:
         result = chain.invoke({
             "issues_text": state["log_summary"],
             "root_cause": state.get("root_cause_analysis") or "RCA not available",
+            "kb_context": _kb_context(state),
         })
 
         elapsed = _elapsed(start)
@@ -249,6 +269,7 @@ def cookbook_node(state: DevOpsState, llm: Optional[Any] = None) -> dict:
         result = chain.invoke({
             "issues_text": state["log_summary"],
             "remediation_text": state.get("remediation_plan") or "See log analysis above.",
+            "kb_context": _kb_context(state),
         })
 
         elapsed = _elapsed(start)
@@ -278,10 +299,16 @@ def jira_node(
     jira_project_key: str = None,
     jira_epic_key: str = None,
     jira_sprint_name: str = None,
+    dedup: bool = None,
 ) -> dict:
     """Files one incident-level ticket for P1/P2 severities (and always for
     the 'other' log type, at P4/Low). Skips silently for P3/P4 on known log
-    types. Defaults every credential from Config when not passed explicitly."""
+    types. Defaults every credential from Config when not passed explicitly.
+
+    With `dedup` on (default Config.DEDUP_ENABLED), a repeat of the same
+    incident inside the TTL returns the existing ticket (flagged
+    `"duplicate": True`) instead of filing another."""
+    dedup = Config.DEDUP_ENABLED if dedup is None else dedup
     mock_mode = Config.JIRA_MOCK_MODE if mock_mode is None else mock_mode
     jira_server = Config.JIRA_SERVER if jira_server is None else jira_server
     jira_email = Config.JIRA_EMAIL if jira_email is None else jira_email
@@ -302,6 +329,19 @@ def jira_node(
         status["jira"] = {"status": "skipped", "reason": "severity < P2"}
         return {"jira_tickets": [], "pipeline_status": status}
     effective_severity = "P4" if is_other and severity not in ("P1", "P2") else severity
+
+    fp = devops_dedup.fingerprint(state.get("raw_logs", "")) if dedup else None
+    if fp:
+        try:
+            known = devops_dedup.get(fp)
+        except Exception as dedup_err:
+            known = None
+            print(f"   dedup lookup failed ({dedup_err}) - continuing without dedup")
+        if known and known.get("ticket"):
+            existing = {**known["ticket"], "duplicate": True}
+            print(f"   duplicate of {existing.get('key')} - not filing a new ticket")
+            status["jira"] = {"status": "deduplicated", "fingerprint": fp}
+            return {"jira_tickets": [existing], "pipeline_status": status}
 
     try:
         if mock_mode:
@@ -425,6 +465,12 @@ def jira_node(
             }]
             print(f"   LIVE: ticket {issue_key} created -> {base}/browse/{issue_key}")
 
+        if fp:
+            try:
+                devops_dedup.update(fp, ticket=tickets[0])
+            except Exception as dedup_err:
+                print(f"   dedup record failed ({dedup_err}) - ticket was still created")
+
         elapsed = _elapsed(start)
         status["jira"] = {"status": "done", "elapsed_s": elapsed}
         return {"jira_tickets": tickets, "pipeline_status": status}
@@ -448,7 +494,12 @@ def notification_node(
     n8n_webhook_url: str = None,
     slack_webhook_url: str = None,
     http_timeout: int = 8,
+    dedup: bool = None,
 ) -> dict:
+    """Alert via n8n (primary) with a Slack fallback. Runs after the Jira node,
+    so the payload carries the ticket key. With `dedup` on, a repeat alert for
+    the same incident inside the TTL is suppressed."""
+    dedup = Config.DEDUP_ENABLED if dedup is None else dedup
     mock_mode = Config.NOTIFICATION_MOCK_MODE if mock_mode is None else mock_mode
     n8n_webhook_url = Config.N8N_WEBHOOK_URL if n8n_webhook_url is None else n8n_webhook_url
     slack_webhook_url = Config.SLACK_WEBHOOK_URL if slack_webhook_url is None else slack_webhook_url
@@ -458,12 +509,35 @@ def notification_node(
     status = dict(state.get("pipeline_status") or {})
     receipts = []
 
+    fp = devops_dedup.fingerprint(state.get("raw_logs", "")) if dedup else None
+    if fp:
+        try:
+            known = devops_dedup.get(fp)
+        except Exception as dedup_err:
+            known = None
+            print(f"   dedup lookup failed ({dedup_err}) - continuing without dedup")
+        if known and known.get("notified_at"):
+            print("   suppressed - an alert for this incident was already sent inside the dedup window")
+            status["notification"] = {"status": "suppressed_duplicate", "fingerprint": fp}
+            return {
+                "notifications_sent": [{"channel": "none", "status": "suppressed_duplicate"}],
+                "pipeline_status": status,
+            }
+
+    def _mark_notified(sent: list) -> None:
+        if fp and any(str(r.get("status", "")).startswith("delivered") for r in sent):
+            try:
+                devops_dedup.update(fp, notified=True)
+            except Exception as dedup_err:
+                print(f"   dedup record failed ({dedup_err}) - alert was still sent")
+
     if mock_mode:
         print("   MOCK: n8n + Slack notifications sent")
         receipts = [
             {"channel": "n8n", "status": "delivered_mock", "timestamp": datetime.utcnow().isoformat()},
             {"channel": "slack", "status": "delivered_mock", "timestamp": datetime.utcnow().isoformat()},
         ]
+        _mark_notified(receipts)
         status["notification"] = {"status": "done_mock", "elapsed_s": _elapsed(start)}
         return {"notifications_sent": receipts, "pipeline_status": status}
 
@@ -471,9 +545,9 @@ def notification_node(
         "event_type": "incident_detected",
         "severity": state.get("severity", "P2"),
         "log_type": state.get("log_type", "other"),
-        "rationale": state.get("severity_rationale", ""),
+        "rationale": strip_mentions(state.get("severity_rationale", "") or ""),
         "critical_issues": [
-            i.get("title", i) if isinstance(i, dict) else i
+            strip_mentions(str(i.get("title", i) if isinstance(i, dict) else i))
             for i in (state.get("critical_issues") or [])[:5]
         ],
         "jira_tickets": [t.get("key") for t in (state.get("jira_tickets") or [])],
@@ -499,6 +573,7 @@ def notification_node(
                 log_type=state.get("log_type", "other"),
                 severity_rationale=state.get("severity_rationale", ""),
                 critical_issues=state.get("critical_issues") or [],
+                jira_tickets=state.get("jira_tickets") or [],
             )
             resp = requests.post(
                 slack_webhook_url,
@@ -515,5 +590,6 @@ def notification_node(
     if not receipts:
         receipts = [{"channel": "none", "status": "no_webhook_configured"}]
 
+    _mark_notified(receipts)
     status["notification"] = {"status": "done", "elapsed_s": _elapsed(start)}
     return {"notifications_sent": receipts, "pipeline_status": status}

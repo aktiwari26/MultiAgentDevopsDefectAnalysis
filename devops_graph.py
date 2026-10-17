@@ -2,21 +2,35 @@
 
   START -> classifier -> severity -> root_cause -> remediation -> cookbook
                                                                      |
-                                                       +-------------+-------------+
-                                                       v                           v
-                                                     jira                    notification
-                                                       |                           |
-                                                      END                         END
+                                           approval gate: proceed ---+--- hold (P1/P2 awaiting approval)
+                                                                     v              |
+                                                      jira -> notification -> END   v
+                                                                                   END
 
 Root Cause and Remediation run for every severity. Severity only gates the
 integrations: the Jira node files a ticket for P1/P2 and skips itself otherwise.
 
+Jira runs before Notification (not in parallel) so the alert can carry the
+ticket key. When a run asks for human approval (metadata.require_approval) and
+the severity is P1/P2, the graph stops after the runbook with
+approval_status="pending"; api/main.py resumes it via POST /approve/{request_id}.
+
 """
 from __future__ import annotations
+from typing import Literal
 
 from langgraph.graph import StateGraph, START, END
 
 from devops_state import DevOpsState
+
+
+def approval_router(state: DevOpsState) -> Literal["proceed", "hold"]:
+    """Hold the integrations only when this run needs a human approval that
+    has not been given yet (severity node sets approval_required=True and
+    approval_status="pending" for P1/P2 when require_approval is on)."""
+    if state.get("approval_required") and state.get("approval_status") == "pending":
+        return "hold"
+    return "proceed"
 
 
 def build_graph(
@@ -63,10 +77,8 @@ def build_graph(
     builder.add_edge("root_cause", "remediation")
     builder.add_edge("remediation", "cookbook")
 
-    builder.add_edge("cookbook", "jira")
-    builder.add_edge("cookbook", "notification")
-
-    builder.add_edge("jira", END)
+    builder.add_conditional_edges("cookbook", approval_router, {"proceed": "jira", "hold": END})
+    builder.add_edge("jira", "notification")
     builder.add_edge("notification", END)
 
     return builder.compile()

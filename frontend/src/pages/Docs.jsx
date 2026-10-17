@@ -155,7 +155,7 @@ export default function Docs() {
 
             {/* Stage 4: Operations */}
             <div className="relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-violet-500/20 border border-violet-500/40 text-[8px] font-black text-violet-400 uppercase tracking-widest whitespace-nowrap">Parallel Ops</div>
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-violet-500/20 border border-violet-500/40 text-[8px] font-black text-violet-400 uppercase tracking-widest whitespace-nowrap">Ticket, then Alert</div>
               <div className="p-6 rounded-[2rem] bg-violet-500/[0.02] border border-violet-500/10 flex flex-col gap-4">
                 <div className="w-32 h-24 rounded-2xl bg-white/[0.03] border border-white/[0.08] flex flex-col items-center justify-center gap-2 border-violet-500/30">
                   <Rocket size={20} className="text-violet-400" />
@@ -216,13 +216,13 @@ export default function Docs() {
           <div className="space-y-6">
             <h3 className="text-xl font-bold text-slate-200 tracking-tight">The DevOpsState</h3>
             <p className="text-sm text-slate-500 leading-relaxed">
-              Orchestration is managed via an immutable TypedDict state. We utilize **LangGraph Reducers** to handle parallel data accumulation safely.
+              Orchestration is managed via an immutable TypedDict state. We utilize **LangGraph Reducers** to accumulate list fields (issues, tickets, receipts) safely across nodes.
             </p>
             <div className="space-y-3">
               {[
                 { label: 'raw_logs', type: 'str', desc: 'Original log stream input' },
                 { label: 'severity', type: 'Enum[P1-P4]', desc: 'Incident priority level' },
-                { label: 'jira_tickets', type: 'Annotated[list, add]', desc: 'Parallel ticket accumulator' }
+                { label: 'jira_tickets', type: 'Annotated[list, add]', desc: 'Ticket accumulator' }
               ].map((item) => (
                 <div key={item.label} className="flex items-start gap-3">
                   <Info size={14} className="text-rose-500/50 mt-1" />

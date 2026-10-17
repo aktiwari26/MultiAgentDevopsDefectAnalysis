@@ -14,6 +14,29 @@ const AGENTS = [
 
 const simulateAgentTime = () => 800 + Math.random() * 1800;
 
+// Optional API token (only needed when the server sets API_AUTH_TOKEN). Kept in
+// sessionStorage, so it is forgotten when the tab closes.
+const getApiToken = () => {
+  try { return sessionStorage.getItem('api_token') || ''; } catch { return ''; }
+};
+
+// fetch() that adds the token if we have one and, on a 401, asks for it once and retries.
+async function apiFetch(url, init = {}) {
+  const withAuth = () => {
+    const token = getApiToken();
+    return token ? { ...init, headers: { ...(init.headers || {}), Authorization: `Bearer ${token}` } } : init;
+  };
+  let response = await fetch(url, withAuth());
+  if (response.status === 401) {
+    const entered = window.prompt('This server requires an API token. Enter it to continue:');
+    if (entered) {
+      try { sessionStorage.setItem('api_token', entered.trim()); } catch { /* ignore */ }
+      response = await fetch(url, withAuth());
+    }
+  }
+  return response;
+}
+
 export const useStore = create((set, get) => ({
   // Connections Status
   connections: [
@@ -194,6 +217,10 @@ export const useStore = create((set, get) => ({
   currentAgentIndex: -1,
   pipelineStartTime: 0,
   analysisResult: null,
+  runMeta: null,      // { requestId, redactions, injectionSuspected } from the server's first event
+  approval: null,     // { status: 'pending'|'approving'|'approved'|'rejected', requestId } when a run is held for approval
+  requireApproval: false,
+  setRequireApproval: (value) => set({ requireApproval: value }),
 
   // Input
   activeTab: 'sample',
@@ -251,7 +278,13 @@ export const useStore = create((set, get) => ({
     } else if (state.activeTab === 'sample' && state.selectedSample) {
       const sample = sampleLogs.find(s => s.id === state.selectedSample);
       if (sample) {
-        raw_logs = `${sample.title}\n${sample.description}`;
+        // Real multi-line sample log from the server (data/sample_logs/); fall
+        // back to the one-line description only if it cannot be fetched.
+        try {
+          const res = await fetch(`/samples/${sample.file}`);
+          raw_logs = res.ok ? await res.text() : '';
+        } catch { raw_logs = ''; }
+        if (!raw_logs.trim()) raw_logs = `${sample.title}\n${sample.description}`;
       }
     }
 
@@ -267,6 +300,8 @@ export const useStore = create((set, get) => ({
       currentAgentIndex: -1,
       pipelineStartTime: Date.now(),
       analysisResult: null,
+      runMeta: null,
+      approval: null,
       selectedSample: null,
     });
 
@@ -275,15 +310,17 @@ export const useStore = create((set, get) => ({
     }));
 
     try {
-      const response = await fetch('/analyze', {
+      // jira_mock / notif_mock are deliberately NOT sent: the server's own
+      // JIRA_MOCK_MODE / NOTIFICATION_MOCK_MODE decide whether a run files
+      // real tickets and alerts, so a dashboard click never overrides them.
+      const response = await apiFetch('/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           raw_logs,
           fast_model: state.tuning.fast_model,
           smart_model: state.tuning.reasoning_model,
-          jira_mock: false,
-          notif_mock: false,
+          ...(state.requireApproval ? { require_approval: true } : {}),
           source: state.activeTab === 'log' ? 'custom' : 'sample',
           provider: state.byokProvider,
           api_key: state.byokKeys[state.byokProvider],
@@ -292,7 +329,9 @@ export const useStore = create((set, get) => ({
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        let detail = '';
+        try { detail = (await response.json()).detail || ''; } catch { /* not JSON */ }
+        throw new Error(`HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
       }
 
       const reader = response.body.getReader();
@@ -349,6 +388,26 @@ export const useStore = create((set, get) => ({
                 continue;
               }
 
+              if (eventData.request) {
+                set({ runMeta: {
+                  requestId: eventData.request.request_id,
+                  redactions: eventData.request.redactions || {},
+                  injectionSuspected: !!eventData.request.injection_suspected,
+                } });
+                continue;
+              }
+
+              if (eventData.approval) {
+                // Run is held for human approval: Jira and Alerts have not run yet.
+                set((s) => ({
+                  approval: { status: 'pending', requestId: eventData.approval.request_id },
+                  agents: s.agents.map(a =>
+                    (a.id === 'jira' || a.id === 'alerts') ? { ...a, status: 'awaiting' } : a
+                  ),
+                }));
+                continue;
+              }
+
               // LangGraph update is { [node_name]: state_values }
               const nodeName = Object.keys(eventData)[0];
               const agentId = nodeMap[nodeName];
@@ -380,6 +439,43 @@ export const useStore = create((set, get) => ({
     }
   },
 
+  // Release (or discard) the Jira ticket and alert for a run held for approval.
+  decideApproval: async (approve) => {
+    const { approval } = get();
+    if (!approval || approval.status !== 'pending') return;
+    set({ approval: { ...approval, status: 'approving' } });
+    try {
+      const response = await apiFetch(`/approve/${approval.requestId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ approve }),
+      });
+      if (!response.ok) {
+        let detail = '';
+        try { detail = (await response.json()).detail || ''; } catch { /* not JSON */ }
+        throw new Error(`HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+      }
+      const result = await response.json();
+      set((s) => ({
+        approval: { ...approval, status: approve ? 'approved' : 'rejected' },
+        agents: s.agents.map(a =>
+          (a.id === 'jira' || a.id === 'alerts')
+            ? { ...a, status: approve ? 'done' : 'skipped', time: approve ? simulateAgentTime() : 0 }
+            : a
+        ),
+        analysisResult: {
+          ...s.analysisResult,
+          jira_tickets: result.jira_tickets,
+          notifications_sent: result.notifications_sent,
+          approval_status: result.approval_status,
+        },
+      }));
+    } catch (error) {
+      set({ approval: { ...approval, status: 'pending' } });
+      alert('Approval failed: ' + error.message);
+    }
+  },
+
   resetPipeline: () => {
     set({
       pipelineStatus: 'idle',
@@ -387,6 +483,8 @@ export const useStore = create((set, get) => ({
       currentAgentIndex: -1,
       pipelineStartTime: 0,
       analysisResult: null,
+      runMeta: null,
+      approval: null,
     });
   },
 }));

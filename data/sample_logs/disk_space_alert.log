@@ -1,0 +1,4 @@
+2026-03-13 03:10:09 CRON[2210]: (root) CMD (/usr/sbin/logrotate /etc/logrotate.conf)
+2026-03-13 03:10:11 logrotate: error: cannot write to /var/log/app/app.log.1: No space left on device
+2026-03-13 03:12:00 node-exporter: filesystem /var/log usage 85.4% (threshold 85%)
+2026-03-13 03:12:00 INFO  [capacity] /var/log growth 1.2GB/day, projected full in 3 days

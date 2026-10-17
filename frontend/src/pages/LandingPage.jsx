@@ -18,7 +18,7 @@ export default function LandingPage() {
 
         // Mirrors the real LangGraph pipeline (devops_graph.py):
         // classifier -> severity -> root_cause -> remediation -> cookbook (runbook)
-        // -> jira (P1/P2 only) + notification, the last two running in parallel.
+        // -> jira (P1/P2 only) -> notification (Jira first, so the alert carries the ticket key).
         const nodeDefs = [
             { id: 'input', label: 'Log Input', sub: 'paste or upload', icon: '📝', color: '#00f2fe' },
             { id: 'classifier', label: 'Classifier', sub: 'log type + summary', icon: '🏷️', color: '#4facfe' },
@@ -493,18 +493,18 @@ export default function LandingPage() {
                                         </p>
                                     </div>
                                     <div className="diagram-item blueprint-card">
-                                        <h3>Parallel Fan-out</h3>
+                                        <h3>Ticket, then Alert</h3>
                                         <div className="blueprint-flow">
                                             <div className="bp-step">Runbook</div>
                                             <div className="bp-arrow">→</div>
-                                            <div className="bp-split">
-                                                <div className="bp-step">JIRA (P1/P2)</div>
-                                                <div className="bp-step">Notification</div>
-                                            </div>
+                                            <div className="bp-step">JIRA (P1/P2)</div>
+                                            <div className="bp-arrow">→</div>
+                                            <div className="bp-step">Notification</div>
                                         </div>
                                         <p className="graphic-caption">
-                                            Once the Runbook is ready, the JIRA ticket (P1/P2 only) and the
-                                            n8n/Slack notification are sent at the same time.
+                                            Once the Runbook is ready the JIRA ticket is filed (P1/P2 only), then the
+                                            n8n/Slack alert is sent with the ticket key. Repeat incidents reuse the
+                                            ticket and are not re-alerted.
                                         </p>
                                     </div>
                                 </div>
@@ -535,7 +535,7 @@ export default function LandingPage() {
                                         <h4>Strengths</h4>
                                         <ul>
                                             <li>Specialized agents with severity-based routing</li>
-                                            <li>Parallel JIRA and notification fan-out</li>
+                                            <li>Alerts carry the JIRA key; repeat incidents are de-duplicated</li>
                                             <li>Per-stage status and timing in every run</li>
                                         </ul>
                                     </div>
@@ -696,18 +696,18 @@ export default function LandingPage() {
                                         member.initial
                                     )}
                                     {(member.github || member.linkedin || member.website || member.x || member["dev.to"]) && (
-                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-wrap items-center justify-center gap-3 p-2">
-                                            {member.github && <a href={member.github} target="_blank" rel="noreferrer" className="text-white hover:text-blue-400 transition-colors"><Github size={18} /></a>}
-                                            {member.linkedin && <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-white hover:text-blue-400 transition-colors"><Linkedin size={18} /></a>}
-                                            {member.website && <a href={member.website} target="_blank" rel="noreferrer" className="text-white hover:text-blue-400 transition-colors"><Globe size={18} /></a>}
-                                            {member.x && <a href={member.x} target="_blank" rel="noreferrer" className="text-white hover:text-blue-400 transition-colors"><Twitter size={18} /></a>}
-                                            {member["dev.to"] && <a href={member["dev.to"]} target="_blank" rel="noreferrer" className="text-white hover:text-blue-400 transition-colors"><Code size={18} /></a>}
+                                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-wrap items-center justify-center gap-1 p-1">
+                                            {member.github && <a href={member.github} target="_blank" rel="noreferrer" className="text-white hover:text-blue-400 transition-colors"><Github size={12} /></a>}
+                                            {member.linkedin && <a href={member.linkedin} target="_blank" rel="noreferrer" className="text-white hover:text-blue-400 transition-colors"><Linkedin size={12} /></a>}
+                                            {member.website && <a href={member.website} target="_blank" rel="noreferrer" className="text-white hover:text-blue-400 transition-colors"><Globe size={12} /></a>}
+                                            {member.x && <a href={member.x} target="_blank" rel="noreferrer" className="text-white hover:text-blue-400 transition-colors"><Twitter size={12} /></a>}
+                                            {member["dev.to"] && <a href={member["dev.to"]} target="_blank" rel="noreferrer" className="text-white hover:text-blue-400 transition-colors"><Code size={12} /></a>}
                                         </div>
                                     )}
                                 </div>
-                                <h4>{member.name}</h4>
-                                {member.role && <p className="text-xs text-blue-400 font-bold uppercase tracking-widest mt-1">{member.role}</p>}
-                                {member.Bio && <p className="text-xs text-slate-400 mt-2 px-2 text-center leading-relaxed">{member.Bio}</p>}
+                                <h4><span className="member-initial">{member.name.charAt(0).toUpperCase()}</span>{member.name.slice(1)}</h4>
+                                {member.role && <p className="text-[0.6rem] text-blue-400 font-bold uppercase tracking-wider mt-1">{member.role}</p>}
+                                {member.Bio && <p className="text-[0.65rem] text-slate-400 mt-1.5 px-1 text-center leading-snug">{member.Bio}</p>}
                             </div>
                         ))}
 

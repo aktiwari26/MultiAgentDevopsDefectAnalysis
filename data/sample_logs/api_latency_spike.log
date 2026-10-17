@@ -1,0 +1,5 @@
+2026-03-09 14:02:11 WARN  [orders-api] p99 latency for GET /api/v1/orders exceeded 5000ms (current 7340ms, baseline 420ms)
+2026-03-09 14:02:12 WARN  [orders-api] slow query 6.8s: SELECT * FROM orders WHERE customer_id = ? ORDER BY created_at DESC
+2026-03-09 14:02:14 WARN  [orders-api] request queue depth 212 (threshold 100), worker pool saturated 32/32
+2026-03-09 14:02:30 ERROR [api-gateway] 504 Gateway Timeout from orders-api for 3.1% of requests in the last minute
+2026-03-09 14:02:41 INFO  [autoscaler] orders-api at 2 of 6 replicas; scale-up requested to 4
