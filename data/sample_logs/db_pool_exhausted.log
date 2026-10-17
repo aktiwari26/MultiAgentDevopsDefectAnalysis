@@ -1,0 +1,6 @@
+2026-03-07 02:14:07 ERROR [payment-service] HikariPool-1 - Connection is not available, request timed out after 30000ms.
+2026-03-07 02:14:08 ERROR [payment-service] Unable to process payment orderId=88231: CannotCreateTransactionException
+2026-03-07 02:14:09 ERROR [api-gateway] 503 Service Unavailable upstream payment-service, error rate 64% over last 5 minutes
+2026-03-07 02:14:15 FATAL: sorry, too many clients already (db-primary, 100/100 connections in use)
+2026-03-07 02:14:20 ERROR [checkout] payments failing for all customers
+2026-03-07 02:14:31 WARN  [pg-monitor] db-primary max_connections=100 reached, 41 connections idle in transaction for > 10 minutes

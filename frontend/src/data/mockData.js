@@ -11,6 +11,7 @@ export const agentConfig = [
 export const sampleLogs = [
   {
     id: 1,
+    file: 'k8s_cpu_pressure',
     title: 'High CPU on k8s node',
     description: 'Node cpu-pressure condition detected across 3 pods in production',
     severity: 'critical',
@@ -18,6 +19,7 @@ export const sampleLogs = [
   },
   {
     id: 2,
+    file: 'db_pool_exhausted',
     title: 'Database connection pool exhausted',
     description: 'PostgreSQL max connections reached (100/100) on db-primary',
     severity: 'critical',
@@ -25,6 +27,7 @@ export const sampleLogs = [
   },
   {
     id: 3,
+    file: 'api_latency_spike',
     title: 'API latency spike detected',
     description: 'p99 latency exceeded 5s for /api/v1/orders endpoint',
     severity: 'warning',
@@ -32,6 +35,7 @@ export const sampleLogs = [
   },
   {
     id: 4,
+    file: 'memory_leak_payment',
     title: 'Memory leak in payment service',
     description: 'Heap usage at 92% with steady growth over 4h',
     severity: 'error',
@@ -39,6 +43,7 @@ export const sampleLogs = [
   },
   {
     id: 5,
+    file: 'ssl_cert_expiring',
     title: 'SSL certificate expiring',
     description: 'Wildcard cert for *.acme.com expires in 72 hours',
     severity: 'warning',
@@ -46,6 +51,7 @@ export const sampleLogs = [
   },
   {
     id: 6,
+    file: 'disk_space_alert',
     title: 'Disk space alert on log volume',
     description: '/var/log mounted volume at 85% capacity',
     severity: 'info',

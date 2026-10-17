@@ -292,7 +292,17 @@ export default function Home() {
     setLiveStreamError('');
     setLiveStreamStatus('connecting');
 
-    const socket = new WebSocket(url);
+    // Pass the API token (set when the server requires one) as a query parameter.
+    let wsUrl = url;
+    try {
+      const token = sessionStorage.getItem('api_token');
+      if (token) {
+        const withToken = new URL(url);
+        withToken.searchParams.set('token', token);
+        wsUrl = withToken.toString();
+      }
+    } catch { /* keep the plain url */ }
+    const socket = new WebSocket(wsUrl);
     socketRef.current = socket;
 
     socket.onopen = () => {

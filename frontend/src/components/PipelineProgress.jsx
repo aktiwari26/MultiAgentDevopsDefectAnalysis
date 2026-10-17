@@ -1,12 +1,16 @@
 import { useRef, useEffect } from 'react';
 import gsap from 'gsap';
-import { Play, RotateCcw } from 'lucide-react';
+import { Play, RotateCcw, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { useStore } from '../store';
 import { agentConfig } from '../data/mockData';
 import AgentCard from './AgentCard';
 
 export default function PipelineProgress() {
-  const { pipelineStatus, agents, startPipeline, resetPipeline } = useStore();
+  const {
+    pipelineStatus, agents, startPipeline, resetPipeline,
+    runMeta, approval, decideApproval, requireApproval, setRequireApproval,
+  } = useStore();
+  const redactionTotal = runMeta ? Object.values(runMeta.redactions || {}).reduce((a, b) => a + b, 0) : 0;
   const containerRef = useRef(null);
   const cardsRef = useRef([]);
   const buttonRef = useRef(null);
@@ -66,6 +70,17 @@ export default function PipelineProgress() {
           {pipelineStatus === 'running' && 'Processing...'}
           {pipelineStatus === 'completed' && <><RotateCcw size={18} /> Run New Analysis</>}
         </button>
+        {pipelineStatus === 'idle' && (
+          <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={requireApproval}
+              onChange={(e) => setRequireApproval(e.target.checked)}
+              className="accent-amber-500"
+            />
+            Hold P1/P2 Jira ticket and alerts until I approve
+          </label>
+        )}
       </div>
 
       {/* Agent Cards */}
@@ -90,6 +105,56 @@ export default function PipelineProgress() {
           </div>
         ))}
       </div>
+
+      {/* Data-handling notices from the server */}
+      {runMeta && (redactionTotal > 0 || runMeta.injectionSuspected) && (
+        <div className="mx-auto max-w-2xl space-y-1 text-center text-xs text-slate-500">
+          {redactionTotal > 0 && (
+            <p className="flex items-center justify-center gap-1.5">
+              <ShieldCheck size={13} className="text-emerald-500" />
+              {redactionTotal} secret/PII value{redactionTotal === 1 ? '' : 's'} masked before analysis
+              ({Object.entries(runMeta.redactions).map(([k, v]) => `${k.toLowerCase().replace(/_/g, ' ')} x${v}`).join(', ')})
+            </p>
+          )}
+          {runMeta.injectionSuspected && (
+            <p className="flex items-center justify-center gap-1.5 text-amber-400">
+              <ShieldAlert size={13} />
+              Log text that reads like instructions to an AI was detected and treated as plain evidence
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Human approval gate */}
+      {approval && approval.status !== 'approved' && approval.status !== 'rejected' && (
+        <div className="mx-auto max-w-xl rounded-2xl border border-amber-500/30 bg-amber-500/10 p-5 text-center space-y-3">
+          <p className="text-sm font-semibold text-amber-300">Analysis complete. Waiting for your approval</p>
+          <p className="text-xs text-slate-400">
+            This is a P1/P2 incident. The JIRA ticket and alert have not been sent yet.
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            <button
+              onClick={() => decideApproval(true)}
+              disabled={approval.status === 'approving'}
+              className="rounded-xl bg-amber-500 px-5 py-2 text-sm font-semibold text-slate-900 hover:bg-amber-400 disabled:opacity-50"
+            >
+              {approval.status === 'approving' ? 'Sending...' : 'Approve and notify'}
+            </button>
+            <button
+              onClick={() => decideApproval(false)}
+              disabled={approval.status === 'approving'}
+              className="rounded-xl border border-white/10 px-5 py-2 text-sm text-slate-300 hover:bg-white/5 disabled:opacity-50"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
+      {approval && (approval.status === 'approved' || approval.status === 'rejected') && (
+        <p className="text-center text-xs text-slate-500">
+          {approval.status === 'approved' ? 'Approved: JIRA ticket and alert sent.' : 'Discarded: no JIRA ticket or alert was sent.'}
+        </p>
+      )}
     </div>
   );
 }

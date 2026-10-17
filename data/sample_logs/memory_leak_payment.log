@@ -1,0 +1,6 @@
+2026-03-10 05:12:00 WARN  [payment-service] heap usage 78% (3.1GB/4.0GB), steady growth over the last 4h
+2026-03-10 07:40:00 WARN  [payment-service] heap usage 86% (3.4GB/4.0GB), old generation not shrinking after full GC
+2026-03-10 09:05:00 WARN  [payment-service] heap usage 92% (3.7GB/4.0GB), GC pause 2.8s
+2026-03-10 09:31:14 ERROR [payment-service] java.lang.OutOfMemoryError: Java heap space
+2026-03-10 09:31:15 ERROR [payment-service] request failed: POST /api/v1/payments 500, 14 requests failed in the last minute
+2026-03-10 09:31:40 INFO  [supervisor] restarting payment-service (restart #3 in the last 24h)

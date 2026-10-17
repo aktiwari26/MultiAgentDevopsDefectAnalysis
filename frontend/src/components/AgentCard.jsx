@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { Tag, AlertTriangle, Search, Wrench, BookOpen, Ticket, Bell, Check, Loader2, Minus, X } from 'lucide-react';
+import { Tag, AlertTriangle, Search, Wrench, BookOpen, Ticket, Bell, Check, Loader2, Minus, X, Clock } from 'lucide-react';
 
 const iconMap = {
   Tag, AlertTriangle, Search, Wrench, BookOpen, Ticket, Bell,
@@ -15,6 +15,8 @@ const statusConfig = {
   // resolves instead of spinning forever.
   skipped: { border: 'border-white/[0.06]', text: 'text-slate-500', icon: 'text-slate-500' },
   error: { border: 'border-rose-500/30', text: 'text-rose-300', icon: 'text-rose-400' },
+  // Run is held for human approval (P1/P2 with require_approval): not started yet.
+  awaiting: { border: 'border-amber-500/30', text: 'text-amber-300', icon: 'text-amber-400' },
 };
 
 const AgentCard = forwardRef(({ agent, index, isActive }, ref) => {
@@ -35,9 +37,15 @@ const AgentCard = forwardRef(({ agent, index, isActive }, ref) => {
           ? 'bg-emerald-500/8 shadow-[0_0_25px_rgba(52,211,153,0.08)]'
           : agent.status === 'error'
           ? 'bg-rose-500/8'
+          : agent.status === 'awaiting'
+          ? 'bg-amber-500/8'
           : 'bg-white/[0.03]'
       } ${isActive ? 'scale-110' : ''}`}
-      title={agent.status === 'skipped' ? 'Skipped — not required for this severity level' : undefined}
+      title={
+        agent.status === 'skipped' ? 'Skipped — not required for this run'
+          : agent.status === 'awaiting' ? 'Awaiting approval'
+          : undefined
+      }
     >
       {/* Icon */}
       <div className={`relative ${agent.status === 'done' ? cfg.icon : 'text-slate-400'}`}>
@@ -54,6 +62,10 @@ const AgentCard = forwardRef(({ agent, index, isActive }, ref) => {
         ) : agent.status === 'error' ? (
           <div className="w-[24px] h-[24px] rounded-full bg-rose-500/20 flex items-center justify-center">
             <X size={16} className="text-rose-400" />
+          </div>
+        ) : agent.status === 'awaiting' ? (
+          <div className="w-[24px] h-[24px] rounded-full bg-amber-500/20 flex items-center justify-center">
+            <Clock size={14} className="text-amber-400" />
           </div>
         ) : (
           <Icon size={22} strokeWidth={1.5} />

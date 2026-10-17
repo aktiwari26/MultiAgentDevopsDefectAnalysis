@@ -7,6 +7,8 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
+from devops_security import strip_mentions
+
 _LOG_TYPE_RULES: list[tuple[list[str], str]] = [
     (["crashloopbackoff", "kubelet", "kubernetes", "kubectl", "k8s", "pod/", "evicted", "livenessprobe", "readinessprobe", "replicaset", "statefulset", "daemonset", "kube-apiserver"], "kubernetes"),
     (["nginx", "upstream timed out", "upstream server", "no live upstreams", "502 bad gateway", "location /", "access.log", "error.log", "client_max_body", "proxy_pass", "proxy_read_timeout"], "nginx"),
@@ -85,10 +87,35 @@ def parse_severity_response(response_text: str) -> dict:
     return {"severity": severity, "rationale": rationale, "critical_issues": critical_issues}
 
 
-def severity_requires_approval(severity: str) -> tuple[bool, str]:
-    requires = severity in ("P1", "P2")
-    status = "pending" if requires else "auto_approved"
-    return requires, status
+def severity_requires_approval(severity: str, require_approval: bool = False) -> tuple[bool, str]:
+    """(approval_required, approval_status).
+
+    A human gate applies only when the run asked for one (`require_approval`)
+    AND the severity is P1/P2; in that case the integrations are held until
+    POST /approve. Otherwise nothing waits, and the status says so honestly
+    ("auto_approved") rather than reporting a "pending" that nothing enforces."""
+    requires = bool(require_approval) and severity in ("P1", "P2")
+    return requires, ("pending" if requires else "auto_approved")
+
+
+_LOG_TYPE_LINE = re.compile(r"(?im)^[\s*#>_`-]*log[_ ]type\s*[*`_]*\s*:[\s*`_]*([a-z]+)\b[^\n]*$")
+
+
+def parse_log_type(response_text: str) -> tuple[str | None, str]:
+    """Pull the classifier's closing 'LOG_TYPE: <category>' line.
+
+    Returns (label, text_without_that_line). `label` is None unless it is one
+    of the known categories, so callers can fall back to the keyword heuristic
+    (an 'other'/missing/garbled label never overrides it)."""
+    if not response_text:
+        return None, response_text or ""
+    matches = list(_LOG_TYPE_LINE.finditer(response_text))
+    if not matches:
+        return None, response_text
+    last = matches[-1]
+    label = last.group(1).lower()
+    cleaned = (response_text[: last.start()] + response_text[last.end():]).rstrip()
+    return (label if label in KNOWN_LOG_TYPES else None), cleaned
 
 
 _SEVERITY_EMOJI = {"P1": "\U0001F534", "P2": "\U0001F7E0", "P3": "\U0001F7E1", "P4": "\U0001F7E2"}
@@ -100,15 +127,22 @@ def build_slack_blocks(
     severity_rationale: str,
     critical_issues: list,
     max_issues: int = 5,
+    jira_tickets: list | None = None,
 ) -> list[dict]:
-    """Build a Slack Block Kit block array for one incident notification."""
+    """Build a Slack Block Kit block array for one incident notification.
+    LLM-authored text is stripped of @channel/@here style mentions."""
     emoji = _SEVERITY_EMOJI.get(severity, "\U0001F534")
     ts_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
     issues_text = "\n".join([
-        f"• {i.get('title', i) if isinstance(i, dict) else str(i)}"
+        f"• {strip_mentions(str(i.get('title', i) if isinstance(i, dict) else i))}"
         for i in (critical_issues or [])[:max_issues]
     ]) or "See full analysis for details."
+    severity_rationale = strip_mentions(severity_rationale or "")
+    ticket_line = ", ".join(
+        f"{t.get('key')}{' (existing)' if t.get('duplicate') else ''}"
+        for t in (jira_tickets or []) if isinstance(t, dict) and t.get("key")
+    )
 
     return [
         {
@@ -122,6 +156,7 @@ def build_slack_blocks(
                 {"type": "mrkdwn", "text": f"*Log Type:* {log_type.upper()}"},
                 {"type": "mrkdwn", "text": f"*Time:* {ts_str}"},
                 {"type": "mrkdwn", "text": f"*Rationale:* {(severity_rationale or 'N/A')[:100]}"},
+                {"type": "mrkdwn", "text": f"*Jira:* {ticket_line or 'none'}"},
             ],
         },
         {

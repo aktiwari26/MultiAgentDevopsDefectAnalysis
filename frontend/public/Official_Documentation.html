@@ -437,12 +437,12 @@
                     <div class="section-header">
                         <h2>Orchestration Layer</h2>
                         <p>The system is built on a <code>StateGraph</code> foundation, enabling complex conditional
-                            routing and parallel processing.</p>
+                            routing and approval gating.</p>
                     </div>
                     <div class="content-card">
                         <h4>TypedDict State Schema</h4>
-                        <p>A unified state object traverses the graph, accumulating context at each node. Parallel
-                            fan-out is handled via <code>Annotated</code> list reducers.</p>
+                        <p>A unified state object traverses the graph, accumulating context at each node. List
+                            fields are merged via <code>Annotated</code> reducers.</p>
                         <div class="code-block">
                             <div class="code-header">
                                 <div class="code-dot" style="background: #ff5f56;"></div>
@@ -455,7 +455,7 @@
                                     <br># Raw input logs</span>
                                 <br>classification: str <span class="comment"># gpt-4o-mini output</span>
                                 <br>severity: str <span class="comment"># P1-P4 assessment</span>
-                                <br>rag_context: Annotated[list, operator.add] <span class="comment"># Parallel
+                                <br>rag_context: Annotated[list, operator.add] <span class="comment"># list
                                     accumulation</span>
                                 <br>root_cause: str
                                 <br>remediation_plan: str
@@ -597,8 +597,8 @@
                         <p>The next phase of DevOps development focuses on closing the feedback loop with automated
                             execution nodes.</p>
                         <div class="feature-list">
-                            <div class="feature-item"><span class="feature-icon">▹</span> Human-in-the-loop Approval
-                                Node</div>
+                            <div class="feature-item"><span class="feature-icon">▹</span> Approval gate: reviewer identity and
+                                audit trail (the opt-in gate itself is available today)</div>
                             <div class="feature-item"><span class="feature-icon">▹</span> Auto-PR generation for
                                 infra-fixes</div>
                             <div class="feature-item"><span class="feature-icon">▹</span> Multi-cluster K8s integration

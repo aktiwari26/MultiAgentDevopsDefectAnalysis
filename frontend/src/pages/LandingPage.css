@@ -1378,16 +1378,16 @@ nav a:hover {
 
 .team-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 2.5rem;
-    margin-top: 4rem;
+    grid-template-columns: repeat(6, minmax(0, 1fr));   /* all six members on one line */
+    gap: 1rem;
+    margin-top: 3rem;
 }
 
 .team-member {
     background: var(--surface-dark);
     border: 1px solid rgba(255, 255, 255, 0.05);
-    padding: 2.5rem;
-    border-radius: 20px;
+    padding: 1.25rem 0.75rem;
+    border-radius: 14px;
     transition: transform 0.3s, background 0.3s;
 }
 
@@ -1397,23 +1397,43 @@ nav a:hover {
 }
 
 .member-avatar {
-    width: 80px;
-    height: 80px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     background: var(--bg-gradient);
-    margin: 0 auto 1.5rem;
+    margin: 0 auto 0.75rem;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
+    font-size: 1rem;
     font-weight: bold;
     color: #fff;
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
 }
 
 .team-member h4 {
-    font-size: 1.2rem;
+    font-size: 0.95rem;
+    line-height: 1.1;
     color: #e2e8f0;
+}
+
+/* First letter of each name: capital, double the size of the rest. Read down the
+   row the initials spell S-P-A-A-R-C, the team name. */
+.member-initial {
+    font-size: 1.9rem;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--primary-cyan);
+    text-transform: uppercase;
+    text-shadow: 0 0 12px rgba(0, 242, 254, 0.35);
+    vertical-align: -0.05em;
+}
+
+/* Team: six across on wide screens, three on tablets */
+@media (max-width: 1100px) {
+    .team-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
 }
 
 /* Responsive Design */
@@ -1542,18 +1562,8 @@ nav a:hover {
     }
 
     .team-grid {
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        gap: 1rem;
-    }
-
-    .team-member {
-        padding: 1.5rem 1rem;
-    }
-
-    .member-avatar {
-        width: 60px;
-        height: 60px;
-        font-size: 1.5rem;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
     }
 }
 

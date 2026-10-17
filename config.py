@@ -6,6 +6,7 @@ observability), Jira (optional, mock by default), Slack/n8n notifications
 of the pipeline gracefully rather than blocking the whole run.
 """
 import os
+from pathlib import Path
 
 import truststore
 
@@ -66,6 +67,34 @@ class Config:
     NOTIFICATION_MOCK_MODE = _bool_env("NOTIFICATION_MOCK_MODE", "True")
     SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL", "")
     N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "")
+
+    # ── Incident de-duplication ──────────────────────────────────────────
+    # A repeat of the same incident (same normalised error evidence) inside
+    # the TTL reuses the existing Jira ticket and suppresses the repeat alert.
+    DEDUP_ENABLED = _bool_env("DEDUP_ENABLED", "True")
+    DEDUP_TTL_HOURS = float(os.getenv("DEDUP_TTL_HOURS", "24"))
+    DEDUP_STORE_PATH = os.getenv("DEDUP_STORE_PATH", str(Path(__file__).parent / "data" / "dedup_store.json"))
+
+    # ── Human approval gate ──────────────────────────────────────────────
+    # When on, a P1/P2 run stops after the runbook and waits for
+    # POST /approve/{request_id} before filing Jira / sending alerts.
+    REQUIRE_APPROVAL = _bool_env("REQUIRE_APPROVAL", "False")
+    APPROVAL_TTL_MINUTES = float(os.getenv("APPROVAL_TTL_MINUTES", "60"))
+
+    # ── API protection ───────────────────────────────────────────────────
+    # API_AUTH_TOKEN unset = open (local development only). When set, every
+    # endpoint except /health and the static dashboard needs
+    # `Authorization: Bearer <token>` (or `X-API-Key: <token>`).
+    API_AUTH_TOKEN = os.getenv("API_AUTH_TOKEN", "")
+    RATE_LIMIT_PER_MIN = int(os.getenv("RATE_LIMIT_PER_MIN", "20"))              # /analyze, /approve
+    WEBHOOK_RATE_LIMIT_PER_MIN = int(os.getenv("WEBHOOK_RATE_LIMIT_PER_MIN", "120"))
+    MAX_LOG_CHARS = int(os.getenv("MAX_LOG_CHARS", "200000"))
+    REDACT_LOGS = _bool_env("REDACT_LOGS", "True")
+    # Hosts a client may point the LLM client at via `base_url` (comma-separated
+    # hostnames). The configured OPENROUTER_BASE_URL host and localhost are
+    # always allowed; anything else is rejected so the server cannot be used to
+    # forward prompts (which contain logs) to an arbitrary URL.
+    ALLOWED_BASE_URL_HOSTS = [h.strip().lower() for h in os.getenv("ALLOWED_BASE_URL_HOSTS", "").split(",") if h.strip()]
 
     @classmethod
     def openrouter_configured(cls) -> bool:
