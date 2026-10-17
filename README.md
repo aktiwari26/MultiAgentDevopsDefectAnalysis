@@ -14,16 +14,20 @@ P1/P2 incidents) a Jira ticket plus a Slack/n8n notification.
 POST /analyze
   -> Classifier            (log_summary, log_type)
        -> Severity          (severity P1-P4, critical_issues)
-            -> P1/P2: Root Cause (RAG) -> Remediation -> Cookbook
-            -> P3/P4: Cookbook directly
+            -> Root Cause (RAG) -> Remediation -> Cookbook    (every severity)
                  -> Jira          (P1/P2 only; skipped otherwise)
                  -> Notification  (n8n primary, Slack fallback)
 ```
 
+Root Cause and Remediation run for **every** severity, so any log gets a
+fix plan. Severity only gates the integrations (Jira is P1/P2 only).
+
 - **Classifier** (`devops_agents.py::classifier_node`) — structured
   incident report + log-type detection (`devops_parsers.py::detect_log_type`).
 - **Severity** — assigns `P1`-`P4` and extracts critical issues
-  (`devops_parsers.py::parse_severity_response`).
+  (`devops_parsers.py::parse_severity_response`). The parser tolerates
+  markdown/casing variations in the model's reply and fails safe to `P2`
+  (never `P3`) if no level can be found.
 - **Root Cause** — retrieves grounding context via keyword search
   (`devops_rag.py`) over embedded runbook snippets plus the Markdown files
   in `data/knowledge_base/`, then generates the RCA. Retrieval happens
@@ -97,8 +101,10 @@ pytest
 ```
 
 Covers graph topology/routing (`tests/test_devops_graph.py` — 7 nodes,
-P1/P2 vs P3/P4 branching, parallel Jira/Notification fan-out) and
-knowledge-base retrieval (`tests/test_devops_rag.py`). Agent LLM calls
+Root Cause/Remediation running for every severity, Jira gated to P1/P2,
+parallel Jira/Notification fan-out), severity-response parsing
+(`tests/test_devops_parsers.py`), and knowledge-base retrieval
+(`tests/test_devops_rag.py`). Agent LLM calls
 aren't exercised directly — tests pass fake node functions into
 `build_graph()` so no live API key is required.
 

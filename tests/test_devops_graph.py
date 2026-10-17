@@ -1,6 +1,6 @@
 import pytest
 
-from devops_graph import build_graph, severity_router, EXPECTED_NODES, EXPECTED_NODE_COUNT
+from devops_graph import build_graph, EXPECTED_NODES, EXPECTED_NODE_COUNT
 
 
 def make_state(**overrides):
@@ -85,19 +85,6 @@ def make_graph(severity="P1"):
     )
 
 
-@pytest.mark.parametrize("severity,expected", [
-    ("P1", "full_pipeline"),
-    ("P2", "full_pipeline"),
-    ("P3", "summary_only"),
-    ("P4", "summary_only"),
-])
-def test_severity_router(severity, expected):
-    assert severity_router({"severity": severity}) == expected
-    # deterministic across repeated calls
-    for _ in range(4):
-        assert severity_router({"severity": severity}) == expected
-
-
 def test_graph_topology_has_exactly_seven_nodes():
     app = make_graph()
     node_names = set(app.get_graph().nodes.keys()) - {"__start__", "__end__"}
@@ -123,13 +110,28 @@ def test_p1_runs_full_pipeline_and_fans_out_jira_and_notification():
     assert "notification" in result["pipeline_status"]
 
 
-def test_p4_skips_root_cause_and_remediation_and_jira():
-    app = make_graph(severity="P4")
+@pytest.mark.parametrize("severity", ["P1", "P2", "P3", "P4"])
+def test_root_cause_and_remediation_run_for_every_severity(severity):
+    app = make_graph(severity=severity)
     result = app.invoke(make_state())
 
-    assert result["severity"] == "P4"
-    assert result["root_cause_analysis"] == ""
-    assert result["remediation_plan"] == ""
-    assert result["jira_tickets"] == []
+    assert result["severity"] == severity
+    assert len(result["root_cause_analysis"]) > 10
+    assert len(result["remediation_plan"]) > 10
     assert len(result["cookbook"]) > 10
     assert len(result["notifications_sent"]) == 1
+    for node in ("root_cause", "remediation"):
+        assert node in result["pipeline_status"]
+
+
+@pytest.mark.parametrize("severity,expected_tickets", [("P1", 1), ("P2", 1), ("P3", 0), ("P4", 0)])
+def test_jira_is_still_gated_by_severity(severity, expected_tickets):
+    app = make_graph(severity=severity)
+    result = app.invoke(make_state())
+    assert len(result["jira_tickets"]) == expected_tickets
+
+
+def test_streaming_visits_root_cause_and_remediation_for_p4():
+    app = make_graph(severity="P4")
+    visited = [next(iter(update)) for update in app.stream(make_state())]
+    assert visited.index("severity") < visited.index("root_cause") < visited.index("remediation") < visited.index("cookbook")

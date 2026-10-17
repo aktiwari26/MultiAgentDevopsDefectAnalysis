@@ -328,6 +328,55 @@ nav a:hover {
 }
 
 /* Architecture Visual (Graphs and Light Tubes) */
+.architecture-wrap {
+    flex: 1.2;
+    min-width: 0;
+}
+
+.architecture-wrap .architecture-visual {
+    flex: none;
+    width: 100%;
+}
+
+.graphic-caption {
+    margin: 1rem 0 0;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.illustrative-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 50px;
+    border: 1px solid rgba(255, 153, 0, 0.5);
+    background: rgba(255, 153, 0, 0.1);
+    color: #ff9900;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.link-label {
+    font-size: 11px;
+    font-weight: 700;
+    paint-order: stroke;
+    stroke: rgba(10, 14, 24, 0.95);
+    stroke-width: 4px;
+    stroke-linejoin: round;
+}
+
+.node-sub {
+    font-size: 0.62rem;
+    color: #94a3b8;
+    line-height: 1.2;
+    margin-top: -6px;
+}
+
 .architecture-visual {
     flex: 1.2;
     position: relative;
@@ -405,7 +454,7 @@ nav a:hover {
     gap: 10px;
     cursor: pointer;
     transition: border-color 0.3s, box-shadow 0.3s;
-    width: 130px;
+    width: 120px;
     text-align: center;
 }
 
@@ -433,7 +482,7 @@ nav a:hover {
 }
 
 /* n8n Node Pulse */
-.node-card[data-id="n8n"] {
+.node-card[data-id="notification"] {
     animation: n8n-pulse 2s infinite alternate;
 }
 
@@ -1389,6 +1438,10 @@ nav a:hover {
         justify-content: center;
     }
 
+    .architecture-wrap {
+        width: 100%;
+    }
+
     .architecture-visual {
         width: 100%;
         height: 550px;
@@ -1441,10 +1494,15 @@ nav a:hover {
     }
 
     .architecture-visual {
-        height: 500px;
+        height: 680px;
         margin-top: 1rem;
         border-radius: 20px;
         overflow: visible;
+    }
+
+    .node-card {
+        width: 110px;
+        padding: 10px 8px;
     }
 
     .section-title h2 {

@@ -16,46 +16,47 @@ export default function LandingPage() {
         const svgGroup = document.getElementById('links-group');
         const nodesGroup = document.getElementById('nodes-group');
 
+        // Mirrors the real LangGraph pipeline (devops_graph.py):
+        // classifier -> severity -> root_cause -> remediation -> cookbook (runbook)
+        // -> jira (P1/P2 only) + notification, the last two running in parallel.
+        const nodeDefs = [
+            { id: 'input', label: 'Log Input', sub: 'paste or upload', icon: '📝', color: '#00f2fe' },
+            { id: 'classifier', label: 'Classifier', sub: 'log type + summary', icon: '🏷️', color: '#4facfe' },
+            { id: 'severity', label: 'Severity', sub: 'P1–P4 triage', icon: '⚠️', color: '#4facfe' },
+            { id: 'rootcause', label: 'Root Cause', sub: 'all severities', icon: '🔍', color: '#b026ff' },
+            { id: 'remediation', label: 'Remediation', sub: 'fix plan + commands', icon: '🔧', color: '#b026ff' },
+            { id: 'runbook', label: 'Runbook', sub: 'all severities', icon: '📖', color: '#ff9900' },
+            { id: 'jira', label: 'JIRA Ticket', sub: 'P1/P2 only', icon: '🎫', color: '#00f260' },
+            { id: 'notification', label: 'Notification', sub: 'n8n, Slack fallback', icon: '🔔', color: '#ff4b2b' }
+        ];
+
+        const desktopPos = {
+            input: [13, 16], classifier: [38, 16], severity: [63, 16], rootcause: [88, 16],
+            runbook: [38, 50], remediation: [88, 50],
+            jira: [13, 84], notification: [63, 84]
+        };
+        const mobilePos = {
+            input: [27, 12], classifier: [73, 12],
+            rootcause: [27, 37], severity: [73, 37],
+            remediation: [27, 62], runbook: [73, 62],
+            jira: [27, 87], notification: [73, 87]
+        };
+
         function getNodes() {
-            const isMobile = window.innerWidth < 768;
-            if (isMobile) {
-                return [
-                    { id: 'input', label: 'CloudWatch Logs', icon: '📝', x: 50, y: 8, color: '#00f2fe' },
-                    { id: 'analyzer', label: 'Log Analyzer', icon: '🔍', x: 25, y: 22, color: '#4facfe' },
-                    { id: 'remediation', label: 'Remediation Agent', icon: '🔧', x: 75, y: 22, color: '#4facfe' },
-                    { id: 'runbook', label: 'Runbook Gen', icon: '📖', x: 50, y: 40, color: '#b026ff' },
-                    { id: 'langsmith', label: 'LangSmith Tracing', icon: '📊', x: 50, y: 56, color: '#ff9900' },
-                    { id: 'jira', label: 'JIRA Ticket', icon: '🎫', x: 25, y: 72, color: '#00f260' },
-                    { id: 'n8n', label: 'n8n Orchestrator', icon: '🔄', x: 75, y: 72, color: '#ff4b2b' },
-                    { id: 'slack', label: 'Slack Alert', icon: '💬', x: 50, y: 88, color: '#00f260' }
-                ];
-            }
-            return [
-                { id: 'input', label: 'CloudWatch Logs', icon: '📝', x: 12, y: 50, color: '#00f2fe' },
-                { id: 'analyzer', label: 'Log Analyzer', icon: '🔍', x: 32, y: 32, color: '#4facfe' },
-                { id: 'remediation', label: 'Remediation Agent', icon: '🔧', x: 32, y: 68, color: '#4facfe' },
-                { id: 'runbook', label: 'Runbook Gen', icon: '📖', x: 52, y: 50, color: '#b026ff' },
-                { id: 'langsmith', label: 'LangSmith Tracing', icon: '📊', x: 52, y: 15, color: '#ff9900' },
-                { id: 'jira', label: 'JIRA Ticket', icon: '🎫', x: 72, y: 32, color: '#00f260' },
-                { id: 'n8n', label: 'n8n Orchestrator', icon: '🔄', x: 72, y: 68, color: '#ff4b2b' },
-                { id: 'slack', label: 'Slack Alert', icon: '💬', x: 88, y: 50, color: '#00f260' }
-            ];
+            const pos = window.innerWidth < 768 ? mobilePos : desktopPos;
+            return nodeDefs.map(n => ({ ...n, x: pos[n.id][0], y: pos[n.id][1] }));
         }
 
         let nodes = getNodes();
 
         const links = [
-            { source: 'input', target: 'analyzer', color: '#00f2fe' },
-            { source: 'input', target: 'remediation', color: '#00f2fe' },
-            { source: 'analyzer', target: 'runbook', color: '#4facfe' },
-            { source: 'remediation', target: 'runbook', color: '#4facfe' },
-            { source: 'analyzer', target: 'langsmith', color: '#ff9900', curve: true },
-            { source: 'remediation', target: 'langsmith', color: '#ff9900', curve: true },
-            { source: 'runbook', target: 'langsmith', color: '#ff9900' },
-            { source: 'runbook', target: 'jira', color: '#b026ff' },
-            { source: 'jira', target: 'n8n', color: '#00f260' },
-            { source: 'n8n', target: 'slack', color: '#ff4b2b', label: 'Alert Trigger' },
-            { source: 'slack', target: 'input', color: '#00f260', curve: true, reverseAnim: true }
+            { source: 'input', target: 'classifier', color: '#00f2fe' },
+            { source: 'classifier', target: 'severity', color: '#4facfe' },
+            { source: 'severity', target: 'rootcause', color: '#b026ff' },
+            { source: 'rootcause', target: 'remediation', color: '#b026ff' },
+            { source: 'remediation', target: 'runbook', color: '#ff9900' },
+            { source: 'runbook', target: 'jira', color: '#00f260', label: 'P1 / P2 only' },
+            { source: 'runbook', target: 'notification', color: '#ff4b2b' }
         ];
 
         function hexToRgb(hex) {
@@ -138,6 +139,7 @@ export default function LandingPage() {
                 el.innerHTML = `
                     <div class="node-icon" style="color: ${node.color}; text-shadow: 0 0 15px ${node.color};">${node.icon}</div>
                     <div class="node-label">${node.label}</div>
+                    <div class="node-sub">${node.sub}</div>
                 `;
                 el.addEventListener('mouseenter', () => {
                     el.style.borderColor = node.color;
@@ -202,6 +204,18 @@ export default function LandingPage() {
                 });
                 svgGroup.appendChild(baseNode);
                 svgGroup.appendChild(lightNode);
+
+                if (link.label) {
+                    const isVertical = Math.abs(tx - sx) < 20;
+                    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    text.setAttribute('class', 'link-label');
+                    text.setAttribute('x', isVertical ? (sx + tx) / 2 - 10 : (sx + tx) / 2);
+                    text.setAttribute('y', isVertical ? (sy + ty) / 2 : (sy + ty) / 2 - 10);
+                    text.setAttribute('text-anchor', isVertical ? 'end' : 'middle');
+                    text.setAttribute('fill', link.color);
+                    text.textContent = link.label;
+                    svgGroup.appendChild(text);
+                }
             });
         }
 
@@ -223,7 +237,7 @@ export default function LandingPage() {
                 new Chart(mttrChartEl.getContext('2d'), {
                     type: 'bar',
                     data: {
-                        labels: ['Manual SRE', 'Legacy Automation', 'DevOps'],
+                        labels: ['Manual SRE', 'Legacy Automation', 'DevOps (target)'],
                         datasets: [{
                             label: 'MTTR (min)',
                             data: [120, 45, 4],
@@ -250,14 +264,14 @@ export default function LandingPage() {
                     data: {
                         labels: ['W1', 'W2', 'W3', 'W4'],
                         datasets: [{
-                            label: 'Accuracy (%)',
+                            label: 'Accuracy (%, illustrative)',
                             data: [82, 89, 94, 98],
                             borderColor: '#00f260',
                             backgroundColor: 'rgba(0, 242, 96, 0.1)',
                             fill: true,
                             tension: 0.4
                         }, {
-                            label: 'Cost ($)',
+                            label: 'Cost ($, illustrative)',
                             data: [40, 32, 28, 22],
                             borderColor: '#ff4b2b',
                             borderDash: [5, 5],
@@ -348,34 +362,41 @@ export default function LandingPage() {
                         </div>
                         <div className="stats-container">
                             <div className="stat-item">
-                                <span className="stat-value">60s</span>
-                                <span className="stat-label">Analysis Time</span>
+                                <span className="stat-value">&lt;60s</span>
+                                <span className="stat-label">Typical Analysis Time</span>
                             </div>
                             <div className="stat-item">
                                 <span className="stat-value">7</span>
                                 <span className="stat-label">AI Agents</span>
                             </div>
                             <div className="stat-item">
-                                <span className="stat-value">100%</span>
-                                <span className="stat-label">Traceability</span>
+                                <span className="stat-value">P1–P4</span>
+                                <span className="stat-label">Severity Triage</span>
                             </div>
                         </div>
                     </div>
-                    <div className="architecture-visual" id="architecture">
-                        <svg id="network-svg">
-                            <defs>
-                                <filter id="glow-strong" x="-50%" y="-50%" width="200%" height="200%">
-                                    <feGaussianBlur stdDeviation="6" result="blur" />
-                                    <feMerge>
-                                        <feMergeNode in="blur" />
-                                        <feMergeNode in="blur" />
-                                        <feMergeNode in="SourceGraphic" />
-                                    </feMerge>
-                                </filter>
-                            </defs>
-                            <g id="links-group"></g>
-                        </svg>
-                        <div id="nodes-group"></div>
+                    <div className="architecture-wrap">
+                        <div className="architecture-visual" id="architecture">
+                            <svg id="network-svg">
+                                <defs>
+                                    <filter id="glow-strong" x="-50%" y="-50%" width="200%" height="200%">
+                                        <feGaussianBlur stdDeviation="6" result="blur" />
+                                        <feMerge>
+                                            <feMergeNode in="blur" />
+                                            <feMergeNode in="blur" />
+                                            <feMergeNode in="SourceGraphic" />
+                                        </feMerge>
+                                    </filter>
+                                </defs>
+                                <g id="links-group"></g>
+                            </svg>
+                            <div id="nodes-group"></div>
+                        </div>
+                        <p className="graphic-caption">
+                            Simplified view of the live pipeline. Hover a stage to highlight its connections;
+                            the moving light shows the direction of data flow. Every log gets Root Cause and
+                            Remediation; severity decides whether a JIRA ticket is filed (P1/P2 only).
+                        </p>
                     </div>
                 </section>
 
@@ -434,12 +455,20 @@ export default function LandingPage() {
                             <div className="tab-content active" id="performance">
                                 <div className="chart-grid">
                                     <div className="chart-item">
-                                        <h3>MTTR Comparison (Minutes)</h3>
+                                        <h3>MTTR Comparison (Minutes) <span className="illustrative-badge">Illustrative</span></h3>
                                         <canvas id="mttrChart"></canvas>
+                                        <p className="graphic-caption">
+                                            MTTR = Mean Time To Resolution. Illustrative targets showing the intended effect
+                                            of automation, not measured results; real figures depend on your incident mix.
+                                        </p>
                                     </div>
                                     <div className="chart-item">
-                                        <h3>Agent Accuracy vs Cost</h3>
+                                        <h3>Agent Accuracy vs Cost <span className="illustrative-badge">Illustrative</span></h3>
                                         <canvas id="costChart"></canvas>
+                                        <p className="graphic-caption">
+                                            Sample trend showing accuracy improving as prompts and knowledge base are tuned
+                                            while cost falls. Not measured data.
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -452,22 +481,31 @@ export default function LandingPage() {
                                             <div className="bp-arrow">↓</div>
                                             <div className="bp-node">Severity</div>
                                             <div className="bp-arrow">↓</div>
-                                            <div className="bp-split">
-                                                <div className="bp-node highlight">RCA (P1/P2)</div>
-                                                <div className="bp-node">Cookbook (P3/P4)</div>
-                                            </div>
+                                            <div className="bp-node highlight">Root Cause</div>
+                                            <div className="bp-arrow">↓</div>
+                                            <div className="bp-node highlight">Remediation</div>
+                                            <div className="bp-arrow">↓</div>
+                                            <div className="bp-node">Runbook</div>
                                         </div>
+                                        <p className="graphic-caption">
+                                            Every log is classified and triaged first, then runs through Root Cause,
+                                            Remediation and Runbook regardless of severity.
+                                        </p>
                                     </div>
                                     <div className="diagram-item blueprint-card">
                                         <h3>Parallel Fan-out</h3>
                                         <div className="blueprint-flow">
-                                            <div className="bp-step">Cookbook</div>
+                                            <div className="bp-step">Runbook</div>
                                             <div className="bp-arrow">→</div>
                                             <div className="bp-split">
-                                                <div className="bp-step">JIRA</div>
-                                                <div className="bp-step">Slack</div>
+                                                <div className="bp-step">JIRA (P1/P2)</div>
+                                                <div className="bp-step">Notification</div>
                                             </div>
                                         </div>
+                                        <p className="graphic-caption">
+                                            Once the Runbook is ready, the JIRA ticket (P1/P2 only) and the
+                                            n8n/Slack notification are sent at the same time.
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -476,11 +514,11 @@ export default function LandingPage() {
                                     {[
                                         { id: 1, name: "Classifier", node: "classifier", role: "Categorise log type; structured summary" },
                                         { id: 2, name: "Severity Assessor", node: "severity", role: "Assign P1–P4 triage; set approval status" },
-                                        { id: 3, name: "Root Cause Analyst", node: "root_cause", role: "RAG-grounded RCA from LanceDB" },
+                                        { id: 3, name: "Root Cause Analyst", node: "root_cause", role: "RCA grounded in a runbook knowledge base (keyword retrieval)" },
                                         { id: 4, name: "Remediation Planner", node: "remediation", role: "Step-by-step remediation planning" },
                                         { id: 5, name: "Cookbook Synthesizer", node: "cookbook", role: "Operational runbook / SOP generation" },
                                         { id: 6, name: "JIRA Agent", node: "jira", role: "Creates ADF-formatted JIRA tickets" },
-                                        { id: 7, name: "Notification Agent", node: "notification", role: "Slack Block Kit alert via n8n" }
+                                        { id: 7, name: "Notification Agent", node: "notification", role: "Alert via n8n webhook; Slack Block Kit fallback" }
                                     ].map(agent => (
                                         <div className="agent-roster-card" key={agent.id}>
                                             <div className="agent-id">#{agent.id}</div>
@@ -496,15 +534,15 @@ export default function LandingPage() {
                                     <div className="swot-card strength">
                                         <h4>Strengths</h4>
                                         <ul>
-                                            <li>Multi-agent parallel processing</li>
-                                            <li>Real-time n8n orchestration</li>
-                                            <li>LangSmith full traceability</li>
+                                            <li>Specialized agents with severity-based routing</li>
+                                            <li>Parallel JIRA and notification fan-out</li>
+                                            <li>Per-stage status and timing in every run</li>
                                         </ul>
                                     </div>
                                     <div className="swot-card weakness">
                                         <h4>Weaknesses</h4>
                                         <ul>
-                                            <li>Initial indexing latency (RAG)</li>
+                                            <li>Keyword-only retrieval over a small knowledge base</li>
                                             <li>Higher token cost for deep reasoning</li>
                                         </ul>
                                     </div>
@@ -535,15 +573,15 @@ export default function LandingPage() {
                     </div>
                     <div className="tech-grid">
                         {[
-                            { name: 'LangGraph', role: 'Agent Orchestration', desc: 'Cyclic DAG state machines' },
-                            { name: 'LanceDB', role: 'Vector Store', desc: 'Local serverless RAG' },
-                            { name: 'FastAPI', role: 'Operational API', desc: 'High-speed Python backend' },
-                            { name: 'OpenRouter', role: 'LLM Gateway', desc: 'Cross-platform workflows' },
-                            { name: 'Ollama', role: 'Local Inference', desc: 'Air-gapped model execution' },
-                            { name: 'LangSmith', role: 'Observability', desc: 'Full-chain trace analysis' },
-                            { name: 'HuggingFace', role: 'Embeddings', desc: 'Local BGE-small indexing' },
+                            { name: 'LangGraph', role: 'Agent Orchestration', desc: 'Stateful agent graph with severity routing' },
+                            { name: 'Knowledge Base', role: 'RAG Retrieval', desc: 'Keyword search over runbooks (vector index planned)' },
+                            { name: 'FastAPI', role: 'Operational API', desc: 'Streams results to the dashboard via SSE' },
+                            { name: 'OpenRouter', role: 'LLM Gateway', desc: 'One API key, many models' },
+                            { name: 'Local Models', role: 'Optional Inference', desc: 'Any OpenAI-compatible endpoint via base URL' },
+                            { name: 'LangSmith', role: 'Observability (optional)', desc: 'Trace analysis when configured' },
+                            { name: 'JIRA Cloud', role: 'Ticketing', desc: 'Auto-files P1/P2 incident tickets' },
                             { name: 'React + Vite', role: 'Console UI', desc: 'Modern reactive dashboard' },
-                            { name: 'n8n', role: 'Automation', desc: 'Cross-platform workflows' },
+                            { name: 'n8n', role: 'Automation', desc: 'Alert webhook with Slack fallback' },
                         ].map((tech) => (
                             <div key={tech.name} className="tech-card group relative overflow-hidden">
                                 <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -569,7 +607,46 @@ export default function LandingPage() {
                     <div className="team-grid">
                         {[
                             {
-                                name: "Ajeet Tiwari",
+								name: "Sachin Jain",
+								role: "Principal Architect",
+								initial: "SJ",
+								colors: "#4facfe, #b026ff",
+								image: "/Sachin.jpg",
+								linkedin: "https://www.linkedin.com/in/sachin-jain-0a02965",
+								github: "",
+								website: "",
+								x: "",
+								"dev.to": "",
+								Bio: "Principal Architect"
+                            },
+                            {
+								 name: "Prashant Agarwal",
+								role: "Backend Dev and AI Learner",
+								initial: "PA",
+								colors: "#4facfe, #b026ff",
+								image: "/Prashant.png",
+								linkedin: "https://www.linkedin.com/in/prashantagarw10/",
+								github: "",
+								website: "",
+								x: "",
+								"dev.to": "",
+								Bio: "Associate Director"
+							},
+                            {
+								name: "Ashish Garg",
+								role: "Technical Manager",
+								initial: "AG",
+								colors: "#4facfe, #b026ff",
+								image: "/Ashish.jpg",
+								linkedin: "Ashish Garg - Iris Software Inc. | LinkedIn",
+								github: "",
+								website: "",
+								x: "",
+								"dev.to": "",
+								Bio: "Associate Director"
+                            },
+                            {
+                                name: "Ajeet Kumar Tiwari",
                                 role: "Full Stack Dev and AI Learner",
                                 initial: "AT",
                                 colors: "#4facfe, #b026ff",
@@ -581,70 +658,31 @@ export default function LandingPage() {
                                 "dev.to": "https://dev.to/developerajeet",
                                 Bio: "AI Learner & Enjoy strategic thinking both on and off the board."
                             },
-                            {
-                                name: "Ashish Garg",
-                                role: "Full Stack Developer",
-                                initial: "CB",
-                                colors: "#4facfe, #b026ff",
-                                image: "/Charchit.jpg",
-                                linkedin: "https://www.linkedin.com/in/charchit-bansal",
-                                github: "https://github.com/charchit95",
-                                website: "https://charchitbansal.com/",
-                                x: "",
-                                "dev.to": "",
-                                Bio: "Always up for a game of chess and enjoy strategic thinking both on and off the board."
-                            },
-                            {
-                                name: "Ravishankar Kutty",
-                                role: "Full Stack Dev and AI Enthusiast",
-                                initial: "R",
-                                colors: "#b026ff, #00f260",
-                                image: "/Rakshit.jpeg",
-                                linkedin: "https://www.linkedin.com/in/rakshit-rangarajan/",
-                                github: "https://github.com/Rakshit-Rangarajan",
-                                website: "https://rakshitr.co.in",
-                                x: "",
-                                "dev.to": "https://dev.to/whimsical_odyssean",
-                                Bio: "Sleep is Overrated Anyways 😁"
-                            },
+							{
+								name: "RaviShankar Kutty",
+								role: "AI Learner",
+								initial: "RK",
+								colors: "#4facfe, #b026ff",
+								image: "/Ravi.png",
+								linkedin: "https://www.linkedin.com/in/ravi-shankar-68784a44",
+								github: "",
+								website: "",
+								x: "",
+								"dev.to": "",
+								Bio: "Senior Director"
+							},
                             {
                                 name: "Chirag Jehanabadi",
-                                role: "Software Architect",
-                                initial: "MD",
-                                colors: "#b026ff, #f8b500",
-                                image: "/Rakshit.jpeg",
-                                linkedin: "https://www.linkedin.com/in/dmonalisa",
-                                github: "https://github.com/letusai15/",
-                                website: "https://monalisadas-knowme.vercel.app/",
-                                x: "https://x.com/MLisa1501",
-                                "dev.to": "https://dev.to/letusai15",
-                                Bio: "I Coalesce Creativity!"
-                            },
-                            {
-                                name: "Prashant Agarwal",
-                                role: "SRE",
-                                initial: "PP",
+                                role: "Director",
+                                initial: "CJ",
                                 colors: "#f8b500, #00f260",
-                                image: "/prakash.jpg",
-                                linkedin: "https://www.linkedin.com/in/prkshrj/",
+                                image: "/Chirag.png",
+                                linkedin: "https://www.linkedin.com/in/ravi-shankar-68784a44",
                                 github: "",
                                 website: "",
                                 x: "",
                                 "dev.to": "",
-                                Bio: "\"Engineer by profession, lifelong learner by mindset\" - Exploring the intersection of AI"
-                            },
-                            {
-                                name: "Sachin Jain",
-                                role: "Lead Developer",
-                                initial: "AS",
-                                colors: "#f8b500, #00f260",
-                                image: "/Avinash.jpeg",
-                                linkedin: "https://www.linkedin.com/in/avinash-shyam-1300ba30/",
-                                github: "",
-                                website: "",
-                                x: "",
-                                "dev.to": "",
-                                Bio: "Lead mobile Dev/Aspiring AI Dev"
+                                Bio: "Director"
                             }
                         ].map(member => (
                             <div className="team-member group" key={member.name}>
