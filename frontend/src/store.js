@@ -321,12 +321,34 @@ export const useStore = create((set, get) => ({
           if (line.startsWith('data: ')) {
             const dataStr = line.slice(6);
             if (dataStr === '[DONE]') {
-              set({ pipelineStatus: 'completed' });
+              set((s) => ({
+                pipelineStatus: 'completed',
+                // Any agent still 'processing' here was never visited by the
+                // graph for this request (e.g. Root Cause/Remediation are
+                // skipped for P3/P4 severity, which routes Severity straight
+                // to Runbook) — resolve it to 'skipped' rather than leaving
+                // the spinner running forever.
+                agents: s.agents.map(a =>
+                  a.status === 'processing' ? { ...a, status: 'skipped' } : a
+                ),
+              }));
               continue;
             }
 
             try {
               const eventData = JSON.parse(dataStr);
+
+              if (eventData.error) {
+                set((s) => ({
+                  pipelineStatus: 'completed',
+                  agents: s.agents.map(a =>
+                    a.status === 'processing' ? { ...a, status: 'error' } : a
+                  ),
+                }));
+                console.error('Pipeline error:', eventData.error);
+                continue;
+              }
+
               // LangGraph update is { [node_name]: state_values }
               const nodeName = Object.keys(eventData)[0];
               const agentId = nodeMap[nodeName];

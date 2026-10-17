@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { Tag, AlertTriangle, Search, Wrench, BookOpen, Ticket, Bell, Check, Loader2 } from 'lucide-react';
+import { Tag, AlertTriangle, Search, Wrench, BookOpen, Ticket, Bell, Check, Loader2, Minus, X } from 'lucide-react';
 
 const iconMap = {
   Tag, AlertTriangle, Search, Wrench, BookOpen, Ticket, Bell,
@@ -9,6 +9,12 @@ const statusConfig = {
   pending: { border: 'border-white/[0.04]', text: 'text-slate-600', icon: 'text-slate-700' },
   processing: { border: 'border-blue-500/30', text: 'text-blue-300', icon: 'text-blue-400' },
   done: { border: 'border-emerald-500/30', text: 'text-emerald-300', icon: 'text-emerald-400' },
+  // Node intentionally bypassed by the graph's severity routing (e.g. a
+  // P3/P4 log skips straight from Severity to Runbook, so Root Cause and
+  // Remediation never execute) — a distinct terminal state so the card
+  // resolves instead of spinning forever.
+  skipped: { border: 'border-white/[0.06]', text: 'text-slate-500', icon: 'text-slate-500' },
+  error: { border: 'border-rose-500/30', text: 'text-rose-300', icon: 'text-rose-400' },
 };
 
 const AgentCard = forwardRef(({ agent, index, isActive }, ref) => {
@@ -27,8 +33,11 @@ const AgentCard = forwardRef(({ agent, index, isActive }, ref) => {
           ? 'bg-blue-500/8 shadow-[0_0_25px_rgba(59,130,246,0.1)]'
           : agent.status === 'done'
           ? 'bg-emerald-500/8 shadow-[0_0_25px_rgba(52,211,153,0.08)]'
+          : agent.status === 'error'
+          ? 'bg-rose-500/8'
           : 'bg-white/[0.03]'
       } ${isActive ? 'scale-110' : ''}`}
+      title={agent.status === 'skipped' ? 'Skipped — not required for this severity level' : undefined}
     >
       {/* Icon */}
       <div className={`relative ${agent.status === 'done' ? cfg.icon : 'text-slate-400'}`}>
@@ -37,6 +46,14 @@ const AgentCard = forwardRef(({ agent, index, isActive }, ref) => {
         ) : agent.status === 'done' ? (
           <div className="w-[24px] h-[24px] rounded-full bg-emerald-500/20 flex items-center justify-center">
             <Check size={16} className="text-emerald-400" />
+          </div>
+        ) : agent.status === 'skipped' ? (
+          <div className="w-[24px] h-[24px] rounded-full bg-white/[0.06] flex items-center justify-center">
+            <Minus size={16} className="text-slate-500" />
+          </div>
+        ) : agent.status === 'error' ? (
+          <div className="w-[24px] h-[24px] rounded-full bg-rose-500/20 flex items-center justify-center">
+            <X size={16} className="text-rose-400" />
           </div>
         ) : (
           <Icon size={22} strokeWidth={1.5} />

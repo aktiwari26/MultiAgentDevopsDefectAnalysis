@@ -1,30 +1,22 @@
 """LangGraph orchestrator for the 7-agent DevOps pipeline:
 
-  START -> classifier -> severity
-                            |
-              +-------------+-------------+
-              | P1/P2 (full_pipeline)      | P3/P4 (summary_only)
-              v                            |
-          root_cause -> remediation -> cookbook <-+
-                                            |
-                              +-------------+-------------+
-                              v                           v
-                            jira                    notification
-                              |                           |
-                             END                         END
+  START -> classifier -> severity -> root_cause -> remediation -> cookbook
+                                                                     |
+                                                       +-------------+-------------+
+                                                       v                           v
+                                                     jira                    notification
+                                                       |                           |
+                                                      END                         END
+
+Root Cause and Remediation run for every severity. Severity only gates the
+integrations: the Jira node files a ticket for P1/P2 and skips itself otherwise.
 
 """
 from __future__ import annotations
-from typing import Literal
 
 from langgraph.graph import StateGraph, START, END
 
 from devops_state import DevOpsState
-
-
-def severity_router(state: DevOpsState) -> Literal["full_pipeline", "summary_only"]:
-    severity = state.get("severity", "P2")
-    return "full_pipeline" if severity in ("P1", "P2") else "summary_only"
 
 
 def build_graph(
@@ -67,12 +59,7 @@ def build_graph(
     builder.add_edge(START, "classifier")
     builder.add_edge("classifier", "severity")
 
-    builder.add_conditional_edges(
-        "severity",
-        severity_router,
-        {"full_pipeline": "root_cause", "summary_only": "cookbook"},
-    )
-
+    builder.add_edge("severity", "root_cause")
     builder.add_edge("root_cause", "remediation")
     builder.add_edge("remediation", "cookbook")
 
